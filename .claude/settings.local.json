@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Applications/Antigravity.app/Contents/Resources/app/**)",
+      "Read(//Applications/Antigravity.app/Contents/**)",
+      "Bash(docker --version)",
+      "Bash(/usr/local/bin/docker run:*)",
+      "Bash(/usr/local/bin/node --version)",
+      "Bash(/opt/homebrew/bin/node --version)"
+    ]
+  }
+}

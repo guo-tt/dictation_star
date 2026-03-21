@@ -1,0 +1,13 @@
+services:
+  app:
+    build: .
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount local folder so edits are reflected immediately (HMR)
+      - .:/srv
+      # Separate named volume for node_modules so the host mount doesn't shadow them
+      - node_modules:/srv/node_modules
+
+volumes:
+  node_modules:
