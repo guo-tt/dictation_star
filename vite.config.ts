@@ -7,9 +7,11 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     watch: {
-      // Polling needed for file-watching inside Docker volume mounts on macOS/Windows
       usePolling: true,
       interval: 300,
     },
+  },
+  test: {
+    environment: 'node',
   },
 })

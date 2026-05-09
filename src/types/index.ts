@@ -1,5 +1,11 @@
 export type Subject = 'chinese' | 'english';
-export type ViewMode = 'home' | 'wordlists' | 'dictation' | 'study';
+export type ViewMode = 'wordlists' | 'wordSelector' | 'dictation' | 'study';
+export type GradeFilter = 'all' | 5 | 6;
+
+export interface SessionConfig {
+  words: Word[];
+  grade: string;  // '全部' | '五年级' | '六年级' — display label only
+}
 export type DictationMode = 'parent' | 'student';
 export type FilterMode = 'all' | 'error-rate' | 'not-practiced';
 export type WordType = 'char' | 'word' | 'sentence';
