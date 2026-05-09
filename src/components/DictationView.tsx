@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { WordList, DictationMode, FilterMode, Subject } from '../types';
+import { WordList, DictationMode, FilterMode, Subject, SessionConfig } from '../types';
 import { getWordStats, clearAllRecords } from '../utils/storage';
 import WordCard from './WordCard';
 
@@ -8,6 +8,7 @@ interface DictationViewProps {
   dictationMode: DictationMode;
   filterMode: FilterMode;
   subject: Subject;
+  sessionConfig?: SessionConfig;
 }
 
 export default function DictationView({
@@ -15,6 +16,7 @@ export default function DictationView({
   dictationMode,
   filterMode,
   subject,
+  sessionConfig,
 }: DictationViewProps) {
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
   const [confirmClear, setConfirmClear] = useState(false);
@@ -27,6 +29,9 @@ export default function DictationView({
   }
 
   const filteredWords = useMemo(() => {
+    // Session mode: words already chosen by WordSelectorView
+    if (sessionConfig) return sessionConfig.words;
+
     let words = [...wordList.words];
 
     if (filterMode === 'error-rate') {
@@ -47,7 +52,7 @@ export default function DictationView({
     }
 
     return words;
-  }, [wordList, filterMode]);
+  }, [wordList, filterMode, sessionConfig]);
 
   if (filteredWords.length === 0) {
     return (
@@ -63,16 +68,18 @@ export default function DictationView({
     );
   }
 
+  const headerLabel = sessionConfig
+    ? `共 ${filteredWords.length} 个词语`
+    : filterMode === 'all'
+    ? `共 ${filteredWords.length} 个词语`
+    : filterMode === 'error-rate'
+    ? `按错误率排序 · ${filteredWords.length} 个词`
+    : `近1个月未练习 · ${filteredWords.length} 个词`;
+
   return (
     <div className="p-4 md:p-8 pb-8">
       <div className="flex items-center justify-between text-sm text-stone-500 px-1 mb-3">
-        <span>
-          {filterMode === 'all'
-            ? `共 ${filteredWords.length} 个词语`
-            : filterMode === 'error-rate'
-            ? `按错误率排序 · ${filteredWords.length} 个词`
-            : `近1个月未练习 · ${filteredWords.length} 个词`}
-        </span>
+        <span>{headerLabel}</span>
         <div className="flex items-center gap-2">
           {confirmClear ? (
             <div className="flex gap-1">
@@ -97,11 +104,13 @@ export default function DictationView({
               清除全部记录
             </button>
           )}
-          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-            dictationMode === 'parent'
-              ? 'bg-[#F0F2FB] text-[#5868A8]'
-              : 'bg-[#EEF5FA] text-[#407898]'
-          }`}>
+          <span
+            className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+              dictationMode === 'parent'
+                ? 'bg-[#F0F2FB] text-[#5868A8]'
+                : 'bg-[#EEF5FA] text-[#407898]'
+            }`}
+          >
             {dictationMode === 'parent' ? '家长模式' : '学生模式'}
           </span>
         </div>
