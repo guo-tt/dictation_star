@@ -70,8 +70,8 @@ export default function WordListView({ onOpenSelector, onStudy }: WordListViewPr
   function buildDictationList(): WordList {
     if (!selectedListId) {
       const base = buildAllList('chinese');
-      const words = allLists.flatMap(l => l.words);
-      // deduplicate by id
+      const source = gradeFilter === 'all' ? allLists : allLists.filter(l => l.grade === gradeFilter);
+      const words = source.flatMap(l => l.words);
       const seen = new Set<string>();
       return { ...base, words: words.filter(w => seen.has(w.id) ? false : (seen.add(w.id), true)) };
     }
