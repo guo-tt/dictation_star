@@ -4,7 +4,7 @@ import { getWordStats } from './storage';
 
 export type AutoSelectRule = 'most-errors' | 'least-recent' | 'recent-error-rate';
 
-function scoreWord(wordId: string, rule: AutoSelectRule, stats: WordStats): number {
+function scoreWord(rule: AutoSelectRule, stats: WordStats): number {
   if (rule === 'most-errors') {
     return stats.total - stats.correct;
   }
@@ -35,8 +35,8 @@ export function rankWords(
     lastIntervalMs: null,
   };
   return [...words].sort((a, b) => {
-    const sa = scoreWord(a.id, rule, statsMap[a.id] ?? defaultStats);
-    const sb = scoreWord(b.id, rule, statsMap[b.id] ?? defaultStats);
+    const sa = scoreWord(rule, statsMap[a.id] ?? defaultStats);
+    const sb = scoreWord(rule, statsMap[b.id] ?? defaultStats);
     if (sa === Infinity && sb === Infinity) return 0;
     if (sa === Infinity) return -1;
     if (sb === Infinity) return 1;
