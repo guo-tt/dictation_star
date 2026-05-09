@@ -60,7 +60,9 @@ export default function DictationView({
         <div className="text-5xl mb-4">🎉</div>
         <h3 className="text-xl font-bold text-stone-700">没有符合条件的词语</h3>
         <p className="text-stone-400 text-sm mt-2">
-          {filterMode === 'not-practiced'
+          {sessionConfig
+            ? '没有选中的词语。'
+            : filterMode === 'not-practiced'
             ? '所有词语在最近一个月内都练习过了，真棒！'
             : '请尝试其他筛选条件。'}
         </p>
@@ -81,28 +83,30 @@ export default function DictationView({
       <div className="flex items-center justify-between text-sm text-stone-500 px-1 mb-3">
         <span>{headerLabel}</span>
         <div className="flex items-center gap-2">
-          {confirmClear ? (
-            <div className="flex gap-1">
+          {!sessionConfig && (
+            confirmClear ? (
+              <div className="flex gap-1">
+                <button
+                  onClick={handleClearAll}
+                  className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
+                >
+                  确认清除
+                </button>
+                <button
+                  onClick={() => setConfirmClear(false)}
+                  className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
+                >
+                  取消
+                </button>
+              </div>
+            ) : (
               <button
-                onClick={handleClearAll}
-                className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
+                onClick={() => setConfirmClear(true)}
+                className="text-xs text-stone-300 hover:text-[#D09098] transition-colors"
               >
-                确认清除
+                清除全部记录
               </button>
-              <button
-                onClick={() => setConfirmClear(false)}
-                className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
-              >
-                取消
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setConfirmClear(true)}
-              className="text-xs text-stone-300 hover:text-[#D09098] transition-colors"
-            >
-              清除全部记录
-            </button>
+            )
           )}
           <span
             className={`text-xs px-2 py-0.5 rounded-full font-medium ${
