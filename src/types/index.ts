@@ -1,5 +1,5 @@
 export type Subject = 'chinese' | 'english';
-export type ViewMode = 'wordlists' | 'wordSelector' | 'dictation' | 'study';
+export type ViewMode = 'wordlists' | 'lessonSelector' | 'wordSelector' | 'dictation' | 'study';
 export type GradeFilter = 'all' | 5 | 6;
 
 export interface SessionConfig {
@@ -26,6 +26,8 @@ export interface WordList {
   name: string;
   subject: Subject;
   grade?: number;
+  lesson?: number;        // 1-17 for P5, 1-12 for P6
+  lessonTitle?: string;   // e.g. '《到户外去》'
   words: Word[];
   isVirtual?: boolean;
 }
