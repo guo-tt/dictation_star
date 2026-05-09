@@ -1,53 +1,29 @@
-import { useState, useEffect } from 'react';
-import { User } from 'firebase/auth';
-import { downloadFromCloud } from './utils/cloudSync';
-import { onAuthChanged, signOut } from './utils/firebase';
-import { Subject, ViewMode, DictationMode, FilterMode, WordList } from './types';
+import { useState } from 'react';
+import { ViewMode, DictationMode, FilterMode, WordList, GradeFilter, SessionConfig } from './types';
 import Header from './components/Header';
-import HomeView from './components/HomeView';
 import WordListView from './components/WordListView';
+import WordSelectorView from './components/WordSelectorView';
 import DictationView from './components/DictationView';
 import StudyView from './components/StudyView';
 import SearchModal from './components/SearchModal';
-import LoginView from './components/LoginView';
 
 export default function App() {
-  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = loading
-  const [view, setView] = useState<ViewMode>('home');
-  const [dataVersion, setDataVersion] = useState(0);
+  const [view, setView] = useState<ViewMode>('wordlists');
   const [showSearch, setShowSearch] = useState(false);
-
-  useEffect(() => {
-    const unsub = onAuthChanged(u => setUser(u));
-    return unsub;
-  }, []);
-
-  useEffect(() => {
-    if (!user) return;
-    downloadFromCloud().then(changed => {
-      if (changed) setDataVersion(v => v + 1);
-    });
-  }, [user]);
-
-  const [subject, setSubject] = useState<Subject>('chinese');
   const [selectedList, setSelectedList] = useState<WordList | null>(null);
   const [dictationMode, setDictationMode] = useState<DictationMode>('parent');
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [selectorGrade, setSelectorGrade] = useState<GradeFilter>('all');
+  const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
 
-  function goHome() {
-    setView('home');
-    setSelectedList(null);
-  }
-
-  function selectSubject(s: Subject) {
-    setSubject(s);
-    setView('wordlists');
-  }
-
-  function startDictation(list: WordList, mode: DictationMode, filter: FilterMode) {
-    setSelectedList(list);
+  function openWordSelector(grade: GradeFilter, mode: DictationMode) {
+    setSelectorGrade(grade);
     setDictationMode(mode);
-    setFilterMode(filter);
+    setView('wordSelector');
+  }
+
+  function startFromSelector(config: SessionConfig) {
+    setSessionConfig(config);
     setView('dictation');
   }
 
@@ -58,63 +34,58 @@ export default function App() {
     setView('study');
   }
 
+  function handleBack() {
+    setSessionConfig(null);
+    setView('wordlists');
+  }
+
   const headerTitle =
-    view === 'home' ? '听写小状元'
-    : view === 'wordlists' ? (subject === 'chinese' ? '语文听写' : '英语听写')
+    view === 'wordlists' ? '听写小状元'
+    : view === 'wordSelector' ? '选择词语'
     : view === 'study' ? `学习：${selectedList?.name ?? ''}`
+    : sessionConfig ? `听写 · ${sessionConfig.grade}`
     : selectedList?.name ?? '听写';
 
   const headerBack =
-    view === 'wordlists' ? goHome
-    : view === 'dictation' ? () => setView('wordlists')
-    : view === 'study' ? () => setView('wordlists')
-    : undefined;
-
-  if (user === undefined) {
-    return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#8090C0] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (user === null) {
-    return <LoginView />;
-  }
+    view === 'dictation' || view === 'study' || view === 'wordSelector'
+      ? handleBack
+      : undefined;
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col max-w-6xl mx-auto">
+    <div className="min-h-screen bg-stone-50 flex flex-col max-w-2xl mx-auto">
       <Header
-        view={view}
-        subject={subject}
         onBack={headerBack}
         title={headerTitle}
-        onSearch={() => setShowSearch(true)}
-        userPhotoURL={user.photoURL}
-        userName={user.displayName}
-        onSignOut={signOut}
+        onSearch={view === 'wordlists' ? () => setShowSearch(true) : undefined}
       />
 
-      <main key={dataVersion} className="flex-1 overflow-y-auto">
-        {view === 'home' && <HomeView onSelectSubject={selectSubject} />}
+      <main className="flex-1 flex flex-col overflow-hidden">
         {view === 'wordlists' && (
-          <WordListView subject={subject} onStart={startDictation} onStudy={startStudy} />
+          <WordListView onOpenSelector={openWordSelector} onStudy={startStudy} />
+        )}
+        {view === 'wordSelector' && (
+          <WordSelectorView
+            grade={selectorGrade}
+            dictationMode={dictationMode}
+            onStart={startFromSelector}
+          />
         )}
         {view === 'study' && selectedList && (
           <StudyView
             wordList={selectedList}
             filterMode={filterMode}
-            subject={subject}
+            subject="chinese"
             dictationMode={dictationMode}
             onStartDictation={() => setView('dictation')}
           />
         )}
-        {view === 'dictation' && selectedList && (
+        {view === 'dictation' && (sessionConfig || selectedList) && (
           <DictationView
-            wordList={selectedList}
+            wordList={selectedList ?? { id: '', name: '', subject: 'chinese', words: [] }}
             dictationMode={dictationMode}
             filterMode={filterMode}
-            subject={subject}
+            subject="chinese"
+            sessionConfig={sessionConfig ?? undefined}
           />
         )}
       </main>
