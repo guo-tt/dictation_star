@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Word, GradeFilter, SessionConfig, DictationMode } from '../types';
 import { presetWordLists } from '../data/wordLists';
 import {
@@ -24,6 +24,8 @@ const GRADE_LABEL: Record<string, string> = {
 
 const SESSION_SIZES = [10, 15, 20, 25, 30];
 
+const SHOWN_GRADES = new Set([5, 6]);
+
 const AUTO_RULES: { rule: AutoSelectRule; label: string }[] = [
   { rule: 'most-errors', label: '错误最多' },
   { rule: 'least-recent', label: '最久未练' },
@@ -34,6 +36,11 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [activeRule, setActiveRule] = useState<AutoSelectRule | null>(null);
   const [sessionSize, setSessionSize] = useState(10);
+  const [statsVersion, setStatsVersion] = useState(0);
+
+  useEffect(() => {
+    setStatsVersion(v => v + 1);
+  }, []);
 
   const allWords = useMemo((): Word[] => {
     const hiddenListIds = new Set(getHiddenListIds());
@@ -41,7 +48,7 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
     const presetWords = presetWordLists
       .filter(l =>
         l.subject === 'chinese' &&
-        (l.grade === 5 || l.grade === 6) &&
+        SHOWN_GRADES.has(l.grade ?? -1) &&
         (grade === 'all' || l.grade === grade) &&
         !hiddenListIds.has(l.id),
       )
@@ -66,7 +73,7 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
       const errB = sb.total === 0 ? -1 : (sb.total - sb.correct) / sb.total;
       return errB - errA;
     });
-  }, [allWords]);
+  }, [allWords, statsVersion]);
 
   function applyRule(rule: AutoSelectRule, size: number) {
     const selected = autoSelectWords(sortedWords, rule, size);
@@ -89,6 +96,7 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
   }
 
   function toggleWord(wordId: string) {
+    setActiveRule(null);
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(wordId)) next.delete(wordId);
