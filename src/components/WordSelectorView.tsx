@@ -78,7 +78,8 @@ export default function WordSelectorView({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     if (mode === 'lesson' && lessonListId) {
       const list = presetWordLists.find(l => l.id === lessonListId);
-      return new Set((list?.words ?? []).map(w => w.id));
+      const filtered = applyOverridesAndFilter(list?.words ?? []);
+      return new Set(filtered.map(w => w.id));
     }
     return new Set();
   });
@@ -124,7 +125,10 @@ export default function WordSelectorView({
 
   function handleSizeClick(size: number) {
     setSessionSize(size);
-    if (activeRule && mode === 'mixed') applyRule(activeRule, size);
+    if (activeRule) {
+      const effectiveSize = mode === 'lesson' ? (size === 0 ? allWords.length : size) : size;
+      applyRule(activeRule, effectiveSize);
+    }
   }
 
   function toggleWord(wordId: string) {
