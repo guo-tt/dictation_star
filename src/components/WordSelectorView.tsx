@@ -10,10 +10,16 @@ import {
 } from '../utils/storage';
 import { autoSelectWords, AutoSelectRule } from '../utils/autoSelect';
 
+const SESSION_SIZES_MIXED = [10, 15, 20, 25, 30];
+const SESSION_SIZES_LESSON = [0, 5, 10];
+const SESSION_SIZE_LABELS: Record<number, string> = { 0: '全部' };
+
 interface WordSelectorViewProps {
   grade: GradeFilter;
   dictationMode: DictationMode;
   onStart: (config: SessionConfig) => void;
+  mode?: 'lesson' | 'mixed';
+  lessonListId?: string;
 }
 
 const GRADE_LABEL: Record<string, string> = {
@@ -21,8 +27,6 @@ const GRADE_LABEL: Record<string, string> = {
   '5': '五年级',
   '6': '六年级',
 };
-
-const SESSION_SIZES = [10, 15, 20, 25, 30];
 
 const SHOWN_GRADES = new Set([5, 6]);
 
@@ -32,39 +36,56 @@ const AUTO_RULES: { rule: AutoSelectRule; label: string }[] = [
   { rule: 'recent-error-rate', label: '近期错误率' },
 ];
 
-export default function WordSelectorView({ grade, dictationMode: _dictationMode, onStart }: WordSelectorViewProps) {
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+export default function WordSelectorView({
+  grade, dictationMode: _dictationMode, onStart, mode = 'mixed', lessonListId,
+}: WordSelectorViewProps) {
   const [activeRule, setActiveRule] = useState<AutoSelectRule | null>(null);
-  const [sessionSize, setSessionSize] = useState(10);
   const [statsVersion, setStatsVersion] = useState(0);
 
   useEffect(() => {
     setStatsVersion(v => v + 1);
   }, []);
 
-  const allWords = useMemo((): Word[] => {
-    const hiddenListIds = new Set(getHiddenListIds());
+  const lessonList = useMemo(() => {
+    if (mode !== 'lesson' || !lessonListId) return null;
+    return presetWordLists.find(l => l.id === lessonListId) ?? null;
+  }, [mode, lessonListId]);
 
+  const allWords = useMemo((): Word[] => {
+    if (mode === 'lesson') {
+      if (!lessonList) return [];
+      return applyOverridesAndFilter(lessonList.words);
+    }
+    const hiddenListIds = new Set(getHiddenListIds());
     const presetWords = presetWordLists
       .filter(l =>
         l.subject === 'chinese' &&
         SHOWN_GRADES.has(l.grade ?? -1) &&
+        l.lesson === undefined &&
         (grade === 'all' || l.grade === grade) &&
         !hiddenListIds.has(l.id),
       )
       .flatMap(l => applyOverridesAndFilter(l.words));
-
     const customWords = getCustomLists('chinese')
       .filter(l => grade === 'all' || l.grade === grade)
       .flatMap(l => getCustomWordsForList(l.id));
-
     const seen = new Set<string>();
     return [...presetWords, ...customWords].filter(w =>
       seen.has(w.id) ? false : (seen.add(w.id), true),
     );
-  }, [grade]);
+  }, [grade, mode, lessonList]);
 
-  // Default sort: highest error rate first (unpracticed words go last at 0%)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
+    if (mode === 'lesson' && lessonListId) {
+      const list = presetWordLists.find(l => l.id === lessonListId);
+      return new Set((list?.words ?? []).map(w => w.id));
+    }
+    return new Set();
+  });
+
+  const defaultSize = mode === 'lesson' ? 0 : 10;
+  const [sessionSize, setSessionSize] = useState(defaultSize);
+
   const sortedWords = useMemo(() => {
     return [...allWords].sort((a, b) => {
       const sa = getWordStats(a.id);
@@ -83,16 +104,27 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
   function handleRuleClick(rule: AutoSelectRule) {
     if (activeRule === rule) {
       setActiveRule(null);
-      setSelectedIds(new Set());
+      if (mode === 'lesson') {
+        setSelectedIds(new Set(allWords.map(w => w.id)));
+      } else {
+        setSelectedIds(new Set());
+      }
     } else {
       setActiveRule(rule);
-      applyRule(rule, sessionSize);
+      const size = mode === 'lesson' ? (sessionSize === 0 ? allWords.length : sessionSize) : sessionSize;
+      applyRule(rule, size);
     }
+  }
+
+  function handleLessonSmartSelect(n: number) {
+    const selected = autoSelectWords(sortedWords, 'most-errors', n);
+    setSelectedIds(new Set(selected.map(w => w.id)));
+    setActiveRule('most-errors');
   }
 
   function handleSizeClick(size: number) {
     setSessionSize(size);
-    if (activeRule) applyRule(activeRule, size);
+    if (activeRule && mode === 'mixed') applyRule(activeRule, size);
   }
 
   function toggleWord(wordId: string) {
@@ -107,7 +139,15 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
 
   function handleStart() {
     const selectedWords = sortedWords.filter(w => selectedIds.has(w.id));
-    onStart({ words: selectedWords, grade: GRADE_LABEL[String(grade)] ?? '全部' });
+    const wordsToStart =
+      mode === 'lesson' && sessionSize > 0
+        ? selectedWords.slice(0, sessionSize)
+        : selectedWords;
+    const gradeLabel =
+      mode === 'lesson'
+        ? `${lessonList?.name ?? ''}${lessonList?.lessonTitle ?? ''}`
+        : (GRADE_LABEL[String(grade)] ?? '全部');
+    onStart({ words: wordsToStart, grade: gradeLabel });
   }
 
   return (
@@ -183,52 +223,91 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
         })}
       </div>
 
-      {/* ── Auto-select bar + slider ── */}
+      {/* ── Bottom bar (mode-specific) ── */}
       <div className="bg-stone-50 border-t border-stone-100 px-4 py-3 flex flex-col gap-2">
 
-        {/* Rule buttons + counter */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-400 flex-shrink-0">智能选词</span>
-          <div className="flex gap-1.5 flex-1">
-            {AUTO_RULES.map(({ rule, label }) => (
-              <button
-                key={rule}
-                onClick={() => handleRuleClick(rule)}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                  activeRule === rule
-                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                    : 'bg-white border-stone-200 text-stone-400'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
-            已选 {selectedIds.size} 个
-          </span>
-        </div>
-
-        {/* Session size picker */}
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-stone-400 flex-shrink-0">每次</span>
-          <div className="flex gap-1.5 flex-1">
-            {SESSION_SIZES.map(n => (
-              <button
-                key={n}
-                onClick={() => handleSizeClick(n)}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                  sessionSize === n
-                    ? 'bg-[#8090C0] text-white border-[#8090C0]'
-                    : 'bg-white border-stone-200 text-stone-400'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <span className="text-xs text-stone-400 flex-shrink-0">个词</span>
-        </div>
+        {mode === 'lesson' ? (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">智能选词</span>
+              <div className="flex gap-1.5 flex-1">
+                {[5, 10].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => handleLessonSmartSelect(n)}
+                    className="flex-1 py-1.5 rounded-xl text-xs font-semibold transition border bg-white border-stone-200 text-stone-400 active:opacity-70"
+                  >
+                    错误最多前{n}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
+                已选 {selectedIds.size} 个
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">听写</span>
+              <div className="flex gap-1.5 flex-1">
+                {SESSION_SIZES_LESSON.map(n => (
+                  <button
+                    key={n}
+                    onClick={() => handleSizeClick(n)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      sessionSize === n
+                        ? 'bg-[#8090C0] text-white border-[#8090C0]'
+                        : 'bg-white border-stone-200 text-stone-400'
+                    }`}
+                  >
+                    {SESSION_SIZE_LABELS[n] ?? `${n}个`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">智能选词</span>
+              <div className="flex gap-1.5 flex-1">
+                {AUTO_RULES.map(({ rule, label }) => (
+                  <button
+                    key={rule}
+                    onClick={() => handleRuleClick(rule)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      activeRule === rule
+                        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                        : 'bg-white border-stone-200 text-stone-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
+                已选 {selectedIds.size} 个
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">每次</span>
+              <div className="flex gap-1.5 flex-1">
+                {SESSION_SIZES_MIXED.map(n => (
+                  <button
+                    key={n}
+                    onClick={() => handleSizeClick(n)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      sessionSize === n
+                        ? 'bg-[#8090C0] text-white border-[#8090C0]'
+                        : 'bg-white border-stone-200 text-stone-400'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-stone-400 flex-shrink-0">个词</span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Start button ── */}
@@ -238,7 +317,9 @@ export default function WordSelectorView({ grade, dictationMode: _dictationMode,
           onClick={handleStart}
           className="w-full py-3 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] disabled:opacity-40"
         >
-          {selectedIds.size > 0 ? `开始听写 · ${selectedIds.size} 个词 →` : '请选择词语'}
+          {selectedIds.size > 0
+            ? `开始听写 · ${mode === 'lesson' && sessionSize > 0 ? Math.min(selectedIds.size, sessionSize) : selectedIds.size} 个词 →`
+            : '请选择词语'}
         </button>
       </div>
     </div>
