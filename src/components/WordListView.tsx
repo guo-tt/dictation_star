@@ -19,6 +19,8 @@ import AddListModal from './AddListModal';
 
 interface WordListViewProps {
   onOpenSelector: (grade: GradeFilter, mode: DictationMode) => void;
+  onOpenMixedSelector: (grade: GradeFilter, mode: DictationMode) => void;
+  onOpenLessonSelector: (mode: DictationMode) => void;
   onStudy: (list: WordList, mode: DictationMode, filter: FilterMode) => void;
 }
 
@@ -28,7 +30,7 @@ const GRADE_TABS: { value: GradeFilter; label: string }[] = [
   { value: 6, label: '六年级' },
 ];
 
-export default function WordListView({ onOpenSelector, onStudy }: WordListViewProps) {
+export default function WordListView({ onOpenSelector, onOpenMixedSelector, onOpenLessonSelector, onStudy }: WordListViewProps) {
   const [gradeFilter, setGradeFilter] = useState<GradeFilter>('all');
   const [selectedListId, setSelectedListId] = useState<string>('');
   const [dictationMode, setDictationMode] = useState<DictationMode>('parent');
@@ -128,6 +130,46 @@ export default function WordListView({ onOpenSelector, onStudy }: WordListViewPr
         >
           <Plus size={13} />加词
         </button>
+      </div>
+
+      {/* ── Quick-start section ── */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="text-xs text-stone-400 font-medium mb-2">快速练习</div>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={() => onOpenLessonSelector(dictationMode)}
+            className="rounded-2xl px-4 py-3 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
+          >
+            <div className="text-sm font-bold text-[#5868A8]">按课听写</div>
+            <div className="text-xs text-[#8090C0] mt-0.5">选年级→选课</div>
+          </button>
+          <button
+            onClick={() => onOpenMixedSelector(5, dictationMode)}
+            className="rounded-2xl px-4 py-3 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+          >
+            <div className="text-sm font-bold text-stone-700">五年级混合</div>
+            <div className="text-xs text-stone-400 mt-0.5">全部五年级词语</div>
+          </button>
+          <button
+            onClick={() => onOpenMixedSelector(6, dictationMode)}
+            className="rounded-2xl px-4 py-3 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+          >
+            <div className="text-sm font-bold text-stone-700">六年级混合</div>
+            <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
+          </button>
+          <button
+            onClick={() => onOpenMixedSelector('all', dictationMode)}
+            className="rounded-2xl px-4 py-3 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+          >
+            <div className="text-sm font-bold text-stone-700">全部混合</div>
+            <div className="text-xs text-stone-400 mt-0.5">五六年级一起</div>
+          </button>
+        </div>
+      </div>
+
+      {/* ── 词单管理 header ── */}
+      <div className="px-4 pt-3 pb-1">
+        <div className="text-xs text-stone-400 font-medium">词单管理</div>
       </div>
 
       {/* ── Scrollable word list ── */}
