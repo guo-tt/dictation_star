@@ -2,22 +2,23 @@ import type { Word } from '../types';
 import type { WordStats } from './storage';
 import { getWordStats } from './storage';
 
-export type AutoSelectRule = 'most-errors' | 'least-recent' | 'recent-error-rate';
+export type AutoSelectRule = 'most-errors' | 'least-recent' | 'recent-error-rate' | 'random-errors';
 
 function scoreWord(rule: AutoSelectRule, stats: WordStats): number {
   if (rule === 'most-errors') {
     return stats.total - stats.correct;
   }
   if (rule === 'least-recent') {
-    // null (never practiced) → Infinity so it sorts first
     return stats.lastPracticed === null
       ? Infinity
       : -new Date(stats.lastPracticed).getTime();
   }
-  // recent-error-rate: error rate over last 10 attempts
-  const recent = stats.recentAttempts.slice(-10);
-  if (recent.length === 0) return 0;
-  return recent.filter(a => !a.correct).length / recent.length;
+  if (rule === 'recent-error-rate') {
+    const recent = stats.recentAttempts.slice(-10);
+    if (recent.length === 0) return 0;
+    return recent.filter(a => !a.correct).length / recent.length;
+  }
+  return 0;
 }
 
 /** Pure ranking function — accepts a statsMap so it can be tested without localStorage. */
@@ -44,6 +45,23 @@ export function rankWords(
   });
 }
 
+/** Pick random words from the errors+unpracticed pool. Falls back to all words if pool is empty. */
+export function randomWordsFromErrorsAndUnpracticed(
+  words: Word[],
+  count: number,
+  statsMap?: Record<string, WordStats>,
+): Word[] {
+  const map = statsMap ?? Object.fromEntries(words.map(w => [w.id, getWordStats(w.id)]));
+  const pool = words.filter(w => {
+    const s = map[w.id];
+    if (!s) return true;
+    return s.total === 0 || s.total > s.correct;
+  });
+  const source = pool.length > 0 ? pool : words;
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
 /** Select top `count` words by `rule`, reading stats from localStorage. */
 export function autoSelectWords(
   words: Word[],
@@ -51,6 +69,9 @@ export function autoSelectWords(
   count: number,
   statsMap?: Record<string, WordStats>,
 ): Word[] {
+  if (rule === 'random-errors') {
+    return randomWordsFromErrorsAndUnpracticed(words, count, statsMap);
+  }
   const map = statsMap ?? Object.fromEntries(words.map(w => [w.id, getWordStats(w.id)]));
   return rankWords(words, rule, map).slice(0, count);
 }

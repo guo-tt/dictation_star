@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { rankWords, autoSelectWords } from './autoSelect';
+import { rankWords, autoSelectWords, randomWordsFromErrorsAndUnpracticed } from './autoSelect';
 import type { Word } from '../types';
 import type { WordStats } from './storage';
 
@@ -77,5 +77,52 @@ describe('autoSelectWords', () => {
   it('returns all words if count exceeds list length', () => {
     const result = autoSelectWords(words, 'most-errors', 99, statsMap);
     expect(result).toHaveLength(3);
+  });
+});
+
+function makeStats2(total: number, correct: number): WordStats {
+  return {
+    total,
+    correct,
+    accuracy: total === 0 ? 0 : Math.round((correct / total) * 100),
+    lastPracticed: total > 0 ? new Date().toISOString() : null,
+    recentAttempts: [],
+    lastIntervalMs: null,
+  };
+}
+
+describe('randomWordsFromErrorsAndUnpracticed', () => {
+  it('picks only unpracticed and error words when pool is large enough', () => {
+    const words2 = [makeWord('a'), makeWord('b'), makeWord('c'), makeWord('d')];
+    const statsMap2 = {
+      a: makeStats2(5, 5),  // all correct — excluded
+      b: makeStats2(0, 0),  // unpracticed — included
+      c: makeStats2(3, 1),  // has errors — included
+      d: makeStats2(0, 0),  // unpracticed — included
+    };
+    const result = randomWordsFromErrorsAndUnpracticed(words2, 2, statsMap2);
+    expect(result).toHaveLength(2);
+    result.forEach(w => expect(['b', 'c', 'd']).toContain(w.id));
+  });
+
+  it('falls back to all words when pool is empty', () => {
+    const words2 = [makeWord('a'), makeWord('b')];
+    const statsMap2 = {
+      a: makeStats2(5, 5),
+      b: makeStats2(3, 3),
+    };
+    const result = randomWordsFromErrorsAndUnpracticed(words2, 2, statsMap2);
+    expect(result).toHaveLength(2);
+  });
+
+  it('returns all pool words when count exceeds pool size', () => {
+    const words2 = [makeWord('a'), makeWord('b')];
+    const statsMap2 = {
+      a: makeStats2(0, 0),
+      b: makeStats2(5, 5),
+    };
+    const result = randomWordsFromErrorsAndUnpracticed(words2, 10, statsMap2);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('a');
   });
 });
