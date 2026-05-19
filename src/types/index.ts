@@ -1,5 +1,5 @@
 export type Subject = 'chinese' | 'english';
-export type ViewMode = 'wordlists' | 'lessonSelector' | 'wordSelector' | 'dictation' | 'study';
+export type ViewMode = 'wordlists' | 'lessonSelector' | 'wordSelector' | 'dictation' | 'study' | 'studyList';
 export type GradeFilter = 'all' | 5 | 6;
 
 export interface SessionConfig {
