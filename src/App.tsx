@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ViewMode, DictationMode, FilterMode, WordList, GradeFilter, SessionConfig, Word } from './types';
 import Header from './components/Header';
 import WordListView from './components/WordListView';
@@ -8,10 +8,24 @@ import DictationView from './components/DictationView';
 import StudyView from './components/StudyView';
 import StudyListView from './components/StudyListView';
 import SearchModal from './components/SearchModal';
-import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds } from './utils/storage';
+import BottomToolbar from './components/BottomToolbar';
+import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords } from './utils/storage';
 import { presetWordLists } from './data/wordLists';
 
 ensureFreshInstall();
+
+function getAllGradeWords(grade: GradeFilter): Word[] {
+  const hiddenListIds = new Set(getHiddenListIds());
+  return presetWordLists
+    .filter(l =>
+      l.subject === 'chinese' &&
+      [5, 6].includes(l.grade ?? -1) &&
+      l.lesson === undefined &&
+      (grade === 'all' || l.grade === grade) &&
+      !hiddenListIds.has(l.id),
+    )
+    .flatMap(l => applyOverridesAndFilter(l.words));
+}
 
 export default function App() {
   const [view, setView] = useState<ViewMode>('wordlists');
@@ -30,6 +44,30 @@ export default function App() {
   const [studyTitle, setStudyTitle] = useState('');
   const [studyOrigin, setStudyOrigin] = useState<'lessonSelector' | 'wordlists'>('wordlists');
   const [lessonSelectorMode, setLessonSelectorMode] = useState<'dictation' | 'study'>('dictation');
+
+  const toolbarContext = useMemo((): { contextWords: Word[]; resetLabel: string } => {
+    if (view === 'dictation' && sessionConfig) {
+      return { contextWords: sessionConfig.words, resetLabel: '重置本次进度' };
+    }
+    if (view === 'wordSelector') {
+      if (selectorMode === 'lesson' && selectedLessonId) {
+        const list = presetWordLists.find(l => l.id === selectedLessonId);
+        return {
+          contextWords: list ? applyOverridesAndFilter(list.words) : [],
+          resetLabel: '重置本课进度',
+        };
+      }
+      const label =
+        selectorGrade === 5 ? '重置五年级进度'
+        : selectorGrade === 6 ? '重置六年级进度'
+        : '重置全部进度';
+      return { contextWords: getAllGradeWords(selectorGrade), resetLabel: label };
+    }
+    if (view === 'studyList') {
+      return { contextWords: studyWords, resetLabel: '重置当前进度' };
+    }
+    return { contextWords: getAllGradeWords('all'), resetLabel: '重置全部进度' };
+  }, [view, sessionConfig, selectorMode, selectedLessonId, selectorGrade, studyWords]);
 
   function openMixedSelector(grade: GradeFilter, mode: DictationMode) {
     setSelectorGrade(grade);
@@ -51,16 +89,7 @@ export default function App() {
   }
 
   function openStudyGrade(grade: GradeFilter) {
-    const hiddenListIds = new Set(getHiddenListIds());
-    const words = presetWordLists
-      .filter(l =>
-        l.subject === 'chinese' &&
-        [5, 6].includes(l.grade ?? -1) &&
-        l.lesson === undefined &&
-        (grade === 'all' || l.grade === grade) &&
-        !hiddenListIds.has(l.id),
-      )
-      .flatMap(l => applyOverridesAndFilter(l.words));
+    const words = getAllGradeWords(grade);
     const title = grade === 5 ? '五年级' : grade === 6 ? '六年级' : '全部';
     setStudyWords(words);
     setStudyTitle(title);
@@ -93,6 +122,14 @@ export default function App() {
     if (!sessionConfig || wrongWords.length === 0) return;
     setSessionConfig({ words: wrongWords, grade: sessionConfig.grade });
     setDictationKey(k => k + 1);
+  }
+
+  function handleStartRandom(words: Word[]) {
+    if (words.length === 0) return;
+    const grade = sessionConfig?.grade ?? '全部';
+    setSessionConfig({ words, grade });
+    setDictationKey(k => k + 1);
+    setView('dictation');
   }
 
   function handleBack() {
@@ -174,6 +211,14 @@ export default function App() {
           <StudyListView words={studyWords} />
         )}
       </main>
+
+      <BottomToolbar
+        contextWords={toolbarContext.contextWords}
+        resetLabel={toolbarContext.resetLabel}
+        showRandom={view === 'dictation'}
+        onStartRandom={handleStartRandom}
+        onReset={() => clearWordsRecords(toolbarContext.contextWords.map(w => w.id))}
+      />
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </div>
