@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react';
 import { Volume2, BookOpen, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
 import { Word, DictationMode, Subject } from '../types';
 import { saveAttempt, getWordStats, deleteCustomWord, clearWordRecord } from '../utils/storage';
+import { playSound } from '../utils/sound';
 import EditWordModal from './EditWordModal';
 
 interface WordCardProps {
@@ -9,6 +10,7 @@ interface WordCardProps {
   index: number;
   dictationMode: DictationMode;
   subject: Subject;
+  onAttempt?: (word: Word, correct: boolean) => void;
 }
 
 function speak(text: string, lang: string, rate = 0.8) {
@@ -39,7 +41,7 @@ function formatInterval(ms: number): string {
   return `${days}天`;
 }
 
-export default function WordCard({ word, index, dictationMode, subject }: WordCardProps) {
+export default function WordCard({ word, index, dictationMode, subject, onAttempt }: WordCardProps) {
   const isChinese = subject === 'chinese';
   const lang = isChinese ? 'zh-CN' : 'en-US';
 
@@ -52,9 +54,11 @@ export default function WordCard({ word, index, dictationMode, subject }: WordCa
   const stats = useMemo(() => getWordStats(localWord.id), [localWord.id, statsVersion]);
 
   const handleAttempt = useCallback((correct: boolean) => {
+    playSound(correct ? 'correct' : 'wrong');
     saveAttempt(word.id, correct);
     setStatsVersion(v => v + 1);
-  }, [word.id]);
+    onAttempt?.(localWord, correct);
+  }, [word.id, onAttempt, localWord]);
 
   function playWord() { speak(localWord.text, lang); }
   function playExample() { speak(localWord.example, lang); }
@@ -254,23 +258,27 @@ export default function WordCard({ word, index, dictationMode, subject }: WordCa
           </div>
         )}
 
-        {/* ✓/✗ buttons — always visible */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => handleAttempt(true)}
-            className="flex-1 py-2.5 rounded-xl bg-[#90BE88] hover:bg-[#78A870] active:bg-[#608858] text-white font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-1.5"
-          >
-            <span className="text-base">✓</span>
-            <span>正确</span>
-          </button>
-          <button
-            onClick={() => handleAttempt(false)}
-            className="flex-1 py-2.5 rounded-xl bg-[#D09098] hover:bg-[#B87880] active:bg-[#A06870] text-white font-bold text-sm transition-colors shadow-sm flex items-center justify-center gap-1.5"
-          >
-            <span className="text-base">✗</span>
-            <span>错误</span>
-          </button>
-        </div>
+        {/* ✓/✗ buttons */}
+        {dictationMode === 'student' && !revealed ? (
+          <div className="py-2.5 rounded-xl bg-stone-100 text-stone-400 text-sm text-center font-medium">
+            先点眼睛看答案，再打分
+          </div>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleAttempt(true)}
+              className="flex-1 py-2.5 rounded-xl bg-[#90BE88] hover:bg-[#78A870] active:bg-[#608858] text-white font-bold text-xl transition-colors shadow-sm"
+            >
+              ✓
+            </button>
+            <button
+              onClick={() => handleAttempt(false)}
+              className="flex-1 py-2.5 rounded-xl bg-[#D09098] hover:bg-[#B87880] active:bg-[#A06870] text-white font-bold text-xl transition-colors shadow-sm"
+            >
+              ✗
+            </button>
+          </div>
+        )}
 
         {/* Cumulative stats */}
         <div className="flex items-center gap-3 mt-2.5 pt-2.5 border-t border-stone-100">
