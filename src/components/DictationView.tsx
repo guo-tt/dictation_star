@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
-import { WordList, DictationMode, FilterMode, Subject, SessionConfig } from '../types';
-import { getWordStats, clearAllRecords } from '../utils/storage';
+import { useMemo, useState, useCallback } from 'react';
+import { WordList, DictationMode, FilterMode, Subject, SessionConfig, Word } from '../types';
+import { getWordStats, clearAllRecords, clearWordsRecords } from '../utils/storage';
 import WordCard from './WordCard';
 
 interface DictationViewProps {
@@ -9,6 +9,8 @@ interface DictationViewProps {
   filterMode: FilterMode;
   subject: Subject;
   sessionConfig?: SessionConfig;
+  onComplete?: () => void;
+  onRetry?: (wrongWords: Word[]) => void;
 }
 
 export default function DictationView({
@@ -17,20 +19,53 @@ export default function DictationView({
   filterMode,
   subject,
   sessionConfig,
+  onComplete,
+  onRetry,
 }: DictationViewProps) {
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
   const [confirmClear, setConfirmClear] = useState(false);
   const [cleared, setCleared] = useState(false);
+  const [sessionCorrect, setSessionCorrect] = useState(0);
+  const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionWrongWords, setSessionWrongWords] = useState<Word[]>([]);
+  const [showCompletion, setShowCompletion] = useState(false);
 
   function handleClearAll() {
-    clearAllRecords();
+    if (sessionConfig) {
+      clearWordsRecords(sessionConfig.words.map(w => w.id));
+    } else {
+      clearAllRecords();
+    }
     setCleared(c => !c);
     setConfirmClear(false);
   }
 
+  const handleSessionAttempt = useCallback((word: Word, correct: boolean) => {
+    setSessionTotal(t => t + 1);
+    if (correct) {
+      setSessionCorrect(c => c + 1);
+    } else {
+      setSessionWrongWords(prev =>
+        prev.find(w => w.id === word.id) ? prev : [...prev, word],
+      );
+    }
+  }, []);
+
+  const clearLabel = sessionConfig ? '重置本次进度' : '清除全部记录';
+
   const filteredWords = useMemo(() => {
-    // Session mode: words already chosen by WordSelectorView
-    if (sessionConfig) return sessionConfig.words;
+    if (sessionConfig) {
+      return [...sessionConfig.words].sort((a, b) => {
+        const sa = getWordStats(a.id);
+        const sb = getWordStats(b.id);
+        const errA = sa.total - sa.correct;
+        const errB = sb.total - sb.correct;
+        const groupA = sa.total === 0 ? 0 : errA > 0 ? 1 : 2;
+        const groupB = sb.total === 0 ? 0 : errB > 0 ? 1 : 2;
+        if (groupA !== groupB) return groupA - groupB;
+        return errB - errA;
+      });
+    }
 
     let words = [...wordList.words];
 
@@ -79,34 +114,33 @@ export default function DictationView({
     : `近1个月未练习 · ${filteredWords.length} 个词`;
 
   return (
-    <div className="p-4 md:p-8 pb-8">
+    <div className="flex flex-col h-full">
+    <div className="flex-1 overflow-y-auto p-4 pb-4">
       <div className="flex items-center justify-between text-sm text-stone-500 px-1 mb-3">
         <span>{headerLabel}</span>
         <div className="flex items-center gap-2">
-          {!sessionConfig && (
-            confirmClear ? (
-              <div className="flex gap-1">
-                <button
-                  onClick={handleClearAll}
-                  className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
-                >
-                  确认清除
-                </button>
-                <button
-                  onClick={() => setConfirmClear(false)}
-                  className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
-                >
-                  取消
-                </button>
-              </div>
-            ) : (
+          {confirmClear ? (
+            <div className="flex gap-1">
               <button
-                onClick={() => setConfirmClear(true)}
-                className="text-xs text-stone-300 hover:text-[#D09098] transition-colors"
+                onClick={handleClearAll}
+                className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
               >
-                清除全部记录
+                确认重置
               </button>
-            )
+              <button
+                onClick={() => setConfirmClear(false)}
+                className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmClear(true)}
+              className="text-xs text-stone-300 active:text-[#D09098] transition-colors"
+            >
+              {clearLabel}
+            </button>
           )}
           <span
             className={`text-xs px-2 py-0.5 rounded-full font-medium ${
@@ -128,9 +162,91 @@ export default function DictationView({
             index={index}
             dictationMode={dictationMode}
             subject={subject}
+            onAttempt={handleSessionAttempt}
           />
         ))}
       </div>
+    </div>
+
+    {onComplete && (
+      <div className="bg-white border-t border-stone-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-4">
+        <button
+          onClick={() => setShowCompletion(true)}
+          className="w-full py-3 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition bg-gradient-to-r from-[#7888C8] to-[#A8B8DC]"
+        >
+          完成听写 ✓
+        </button>
+      </div>
+    )}
+
+    {showCompletion && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-6">
+        <div className="bg-white rounded-3xl p-6 shadow-xl w-full max-w-sm">
+          <div className="text-center mb-5">
+            <div className="text-4xl mb-2">
+              {sessionTotal === 0 ? '📋' : sessionWrongWords.length === 0 ? '🎉' : '📊'}
+            </div>
+            <h2 className="text-lg font-bold text-stone-800">本次听写完成</h2>
+          </div>
+
+          {sessionTotal === 0 ? (
+            <p className="text-sm text-stone-400 text-center mb-5">本次未打分</p>
+          ) : (
+            <div className="bg-stone-50 rounded-2xl p-4 mb-5 flex justify-around text-center">
+              <div>
+                <div className="text-2xl font-bold text-[#4A8842]">{sessionCorrect}</div>
+                <div className="text-xs text-stone-400 mt-0.5">答对</div>
+              </div>
+              <div className="w-px bg-stone-200" />
+              <div>
+                <div className="text-2xl font-bold text-[#B05860]">
+                  {sessionTotal - sessionCorrect}
+                </div>
+                <div className="text-xs text-stone-400 mt-0.5">答错</div>
+              </div>
+              <div className="w-px bg-stone-200" />
+              <div>
+                <div
+                  className={`text-2xl font-bold ${
+                    Math.round((sessionCorrect / sessionTotal) * 100) >= 80
+                      ? 'text-[#4A8842]'
+                      : Math.round((sessionCorrect / sessionTotal) * 100) >= 60
+                      ? 'text-amber-500'
+                      : 'text-[#B05860]'
+                  }`}
+                >
+                  {Math.round((sessionCorrect / sessionTotal) * 100)}%
+                </div>
+                <div className="text-xs text-stone-400 mt-0.5">正确率</div>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2">
+            {sessionWrongWords.length > 0 && onRetry && (
+              <button
+                onClick={() => {
+                  setShowCompletion(false);
+                  onRetry(sessionWrongWords);
+                }}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#D09098] to-[#E0A8B0] text-white font-bold text-sm shadow-md active:scale-[0.98] transition"
+              >
+                再练一次错误的词（{sessionWrongWords.length} 个）
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setShowCompletion(false);
+                onComplete?.();
+              }}
+              className="w-full py-3 rounded-2xl border-2 border-stone-200 text-stone-600 font-semibold text-sm active:scale-[0.98] transition"
+            >
+              返回首页
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   );
 }
