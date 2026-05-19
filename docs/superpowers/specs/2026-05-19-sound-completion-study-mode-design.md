@@ -58,17 +58,19 @@ Two buttons:
 | Button | Behavior |
 |--------|----------|
 | 返回首页 | Close modal, call `onComplete` (navigate back to main page) |
-| 再练一次错误的词 | Close modal, call `onRetry(wrongWordIds)` with the set of word IDs that were answered wrong at least once this session. Storage records are **NOT** cleared — all attempts remain saved. `DictationView` restarts with only those words. |
+| 再练一次错误的词 | Close modal, call `onRetry(wrongWords)` with the `Word[]` array of words that were answered wrong at least once this session. Storage records are **NOT** cleared — all attempts remain saved. `App.tsx` rebuilds `SessionConfig` with those words and re-renders `DictationView`. |
 
 **Edge case**: If `sessionWrongWordIds` is empty (all words answered correctly with no wrong presses), the 「再练一次错误的词」button is hidden.
 
 **Edge case**: If the user presses 「完成听写」 without having pressed any ✓ or ✗ (sessionTotal = 0), the popup still appears but shows "本次未打分" instead of stats, with only the 「返回首页」button.
 
 ### Retry flow
-`onRetry(wrongWordIds)` is handled in `DictationView`:
-- Filter `filteredWords` (or `sessionConfig.words`) to only those whose ID is in `wrongWordIds`
-- Reset `sessionCorrect` to 0 and `sessionWrongWordIds` to empty set
-- Show the new filtered word list (same view, no navigation)
+`DictationView` receives a new prop `onRetry(wrongWords: Word[])`. When the user presses 「再练一次错误的词」:
+1. The modal closes.
+2. `onRetry` is called with the array of `Word` objects that were answered wrong at least once this session.
+3. `App.tsx` handles `onRetry` by building a new `SessionConfig` from those wrong words (same grade label) and calling `setSessionConfig` — this re-renders `DictationView` with the new config, which resets all session state naturally.
+
+This keeps `DictationView` stateless about word list management; `App.tsx` owns the session config.
 
 ---
 
@@ -129,9 +131,9 @@ Back button returns to:
 |------|--------|
 | `src/utils/sound.ts` | New file — `playSound('correct' \| 'wrong')` using Web Audio API |
 | `src/components/WordCard.tsx` | Add `onAttempt` prop; call `playSound` in `handleAttempt` |
-| `src/components/DictationView.tsx` | Track `sessionCorrect`, `sessionWrongWordIds`; show completion modal; handle retry |
+| `src/components/DictationView.tsx` | Track `sessionCorrect`, `sessionWrongWordIds`; show completion modal; call `onRetry(wrongWords)` prop |
 | `src/components/WordListView.tsx` | Add 听写/学习 tab switcher; add study entry buttons calling new callbacks |
 | `src/components/LessonSelectorView.tsx` | Add `onStudyLesson` callback prop |
 | `src/components/StudyListView.tsx` | New component — scrollable word list |
-| `src/App.tsx` | Wire up study tab flow; add `'studyList'` ViewMode; handle `onStudyLesson` |
+| `src/App.tsx` | Wire up study tab flow; add `'studyList'` ViewMode; handle `onStudyLesson`; handle `onRetry` by rebuilding `SessionConfig` |
 | `src/types/index.ts` | Add `'studyList'` to `ViewMode` |
