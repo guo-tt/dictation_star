@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { Word, GradeFilter, SessionConfig, DictationMode } from '../types';
 import { presetWordLists } from '../data/wordLists';
+import { getDisplayPinyin } from '../utils/pinyin';
 import {
   getWordStats,
   getCustomLists,
@@ -338,9 +339,7 @@ export default function WordSelectorView({
               {/* Word text + pinyin */}
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-stone-800 text-sm">{word.text}</div>
-                {word.pinyin && (
-                  <div className="text-xs text-stone-400 mt-0.5">{word.pinyin}</div>
-                )}
+                <div className="text-xs text-stone-400 mt-0.5">{getDisplayPinyin(word.text, word.pinyin)}</div>
               </div>
 
               {/* Stats */}
