@@ -96,9 +96,11 @@ for (let i = 0; i < paragraphs.length; i++) {
 }
 
 // Build ChengYu[] with sequential IDs; skip idioms with no examples
+// IDs are assigned AFTER filtering so gaps are not created by filtered-out entries
 const chengyuList = idiomOrder
-  .map((text, i) => ({ id: `cy-${i}`, text, examples: idiomMap.get(text) }))
-  .filter(cy => cy.examples.length > 0);
+  .map(text => ({ text, examples: idiomMap.get(text) }))
+  .filter(cy => cy.examples.length > 0)
+  .map((cy, i) => ({ id: `cy-${i}`, ...cy }));
 
 // Serialize each idiom to TypeScript
 function serializeExamples(examples) {
