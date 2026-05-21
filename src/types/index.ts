@@ -1,5 +1,5 @@
 export type Subject = 'chinese' | 'english';
-export type ViewMode = 'wordlists' | 'lessonSelector' | 'wordSelector' | 'dictation' | 'study' | 'studyList';
+export type ViewMode = 'wordlists' | 'lessonSelector' | 'lessonEdit' | 'wordSelector' | 'dictation' | 'study' | 'studyList';
 export type GradeFilter = 'all' | 5 | 6;
 
 export interface SessionConfig {
@@ -53,10 +53,18 @@ export interface CustomWordEntry {
   createdAt: string;
 }
 
+export interface CustomGrade {
+  id: string;       // 'cgrade-<timestamp>'
+  name: string;     // e.g. '小学四年级', 'P4', '初一'
+  subject: Subject; // 'chinese' only for now
+  createdAt: string;
+}
+
 export interface CustomListMeta {
   id: string;
   name: string;
   subject: Subject;
   grade?: number;
+  gradeId?: string;   // points to CustomGrade.id
   createdAt: string;
 }
