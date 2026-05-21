@@ -116,7 +116,7 @@ export default function WordListView({
           </div>
 
           {/* Dictation entry buttons */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-3">
             <button
               onClick={() => onOpenLessonSelector(dictationMode)}
               className="rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
@@ -124,27 +124,22 @@ export default function WordListView({
               <div className="text-base font-bold text-[#5868A8]">按课听写</div>
               <div className="text-xs text-[#8090C0] mt-0.5">选年级→选课</div>
             </button>
-            <button
-              onClick={() => onOpenMixedSelector(5, dictationMode)}
-              className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-            >
-              <div className="text-base font-bold text-stone-700">五年级</div>
-              <div className="text-xs text-stone-400 mt-0.5">全部五年级词语</div>
-            </button>
-            <button
-              onClick={() => onOpenMixedSelector(6, dictationMode)}
-              className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-            >
-              <div className="text-base font-bold text-stone-700">六年级</div>
-              <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
-            </button>
-            <button
-              onClick={() => onOpenMixedSelector('all', dictationMode)}
-              className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-            >
-              <div className="text-base font-bold text-stone-700">全部</div>
-              <div className="text-xs text-stone-400 mt-0.5">五六年级一起</div>
-            </button>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => onOpenMixedSelector(5, dictationMode)}
+                className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+              >
+                <div className="text-base font-bold text-stone-700">五年级</div>
+                <div className="text-xs text-stone-400 mt-0.5">全部五年级词语</div>
+              </button>
+              <button
+                onClick={() => onOpenMixedSelector(6, dictationMode)}
+                className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+              >
+                <div className="text-base font-bold text-stone-700">六年级</div>
+                <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
+              </button>
+            </div>
           </div>
 
           {/* Custom grade section */}
