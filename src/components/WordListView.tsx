@@ -347,10 +347,12 @@ export default function WordListView({
       )}
 
       {mainTab === 'chengyu' && (
-        <ChengYuPanel
-          onStartDictation={onStartChengyuDictation}
-          onStartStudy={onStartChengyuStudy}
-        />
+        <div className="flex-1 min-h-0 -mx-4">
+          <ChengYuPanel
+            onStartDictation={onStartChengyuDictation}
+            onStartStudy={onStartChengyuStudy}
+          />
+        </div>
       )}
     </div>
   );
