@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ChevronRight, Pencil, Trash2, BookOpen } from 'lucide-react';
-import { DictationMode, GradeFilter, CustomGrade, CustomListMeta } from '../types';
+import { DictationMode, GradeFilter, CustomGrade, CustomListMeta, Word } from '../types';
+import ChengYuPanel from './ChengYuPanel';
+import type { ChengYu } from '../data/chengyu';
 import {
   getCustomGrades, addCustomGrade, deleteCustomGrade,
   addCustomList, getCustomListsForGrade, deleteCustomList,
@@ -15,6 +17,8 @@ interface WordListViewProps {
   onEditLesson: (listId: string) => void;
   onStartCustomLesson: (listId: string, lessonName: string, mode: DictationMode) => void;
   onStartGradeDictation: (gradeId: string, gradeName: string, mode: DictationMode) => void;
+  onStartChengyuDictation: (words: Word[], label: string, mode: DictationMode) => void;
+  onStartChengyuStudy: (list: ChengYu[], label: string) => void;
 }
 
 export default function WordListView({
@@ -25,8 +29,10 @@ export default function WordListView({
   onEditLesson,
   onStartCustomLesson,
   onStartGradeDictation,
+  onStartChengyuDictation,
+  onStartChengyuStudy,
 }: WordListViewProps) {
-  const [mainTab, setMainTab] = useState<'dictation' | 'study'>('dictation');
+  const [mainTab, setMainTab] = useState<'dictation' | 'study' | 'chengyu'>('dictation');
   const [dictationMode, setDictationMode] = useState<DictationMode>('parent');
 
   const [grades, setGrades] = useState<CustomGrade[]>(() => getCustomGrades());
@@ -77,18 +83,22 @@ export default function WordListView({
     <div className="flex flex-col h-full px-4 py-5 gap-4">
 
       {/* Main tab switcher */}
-      <div className="flex gap-2">
-        {(['dictation', 'study'] as const).map(tab => (
+      <div className="flex gap-2 flex-shrink-0">
+        {([
+          { value: 'dictation' as const, label: '听写' },
+          { value: 'study' as const, label: '学习' },
+          { value: 'chengyu' as const, label: '成语' },
+        ]).map(tab => (
           <button
-            key={tab}
-            onClick={() => setMainTab(tab)}
+            key={tab.value}
+            onClick={() => setMainTab(tab.value)}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold transition border ${
-              mainTab === tab
+              mainTab === tab.value
                 ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
                 : 'bg-stone-50 border-stone-200 text-stone-500'
             }`}
           >
-            {tab === 'dictation' ? '听写' : '学习'}
+            {tab.label}
           </button>
         ))}
       </div>
@@ -334,6 +344,13 @@ export default function WordListView({
             <div className="text-xs text-stone-400 mt-0.5">五六年级一起</div>
           </button>
         </div>
+      )}
+
+      {mainTab === 'chengyu' && (
+        <ChengYuPanel
+          onStartDictation={onStartChengyuDictation}
+          onStartStudy={onStartChengyuStudy}
+        />
       )}
     </div>
   );
