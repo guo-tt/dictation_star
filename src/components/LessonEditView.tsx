@@ -10,6 +10,7 @@ import {
   deleteCustomWord,
   addCustomWord,
   getCustomLists,
+  findWordDataInBanks,
 } from '../utils/storage';
 import { getDisplayPinyin } from '../utils/pinyin';
 import EditWordModal from './EditWordModal';
@@ -35,6 +36,7 @@ export default function LessonEditView({ listId, onBack: _onBack }: LessonEditVi
   const [addText, setAddText] = useState('');
   const [addExample, setAddExample] = useState('');
   const [addError, setAddError] = useState('');
+  const [foundWordData, setFoundWordData] = useState<{ location: string; word: Word } | null>(null);
 
   const presetList = useMemo(
     () => presetWordLists.find(l => l.id === listId),
@@ -69,22 +71,32 @@ export default function LessonEditView({ listId, onBack: _onBack }: LessonEditVi
     setVersion(v => v + 1);
   }
 
-  function handleAddWord() {
-    if (!addText.trim()) { setAddError('请输入词语'); return; }
+  function commitAddWord(text: string, example: string, pinyin?: string) {
     const word: Word = {
       id: `custom-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
-      text: addText.trim(),
-      pinyin: undefined,
-      example: addExample.trim(),
-      wordType: addText.trim().length === 1 ? 'char' : 'word',
+      text,
+      pinyin,
+      example,
+      wordType: text.length === 1 ? 'char' : 'word',
       isCustom: true,
     };
     addCustomWord(word, listId, 'chinese');
     setAddText('');
     setAddExample('');
     setAddError('');
+    setFoundWordData(null);
     setShowAddForm(false);
     setVersion(v => v + 1);
+  }
+
+  function handleAddWord() {
+    if (!addText.trim()) { setAddError('请输入词语'); return; }
+    const match = findWordDataInBanks(addText.trim(), 'chinese', listId);
+    if (match) {
+      setFoundWordData(match);
+      return;
+    }
+    commitAddWord(addText.trim(), addExample.trim());
   }
 
   return (
@@ -150,36 +162,84 @@ export default function LessonEditView({ listId, onBack: _onBack }: LessonEditVi
         {/* Inline add form */}
         {showAddForm && (
           <div className="p-4 bg-[#F0F2FB] rounded-2xl border-2 border-[#B0BCDC] flex flex-col gap-3">
-            <input
-              autoFocus
-              type="text"
-              placeholder="词语（必填）"
-              value={addText}
-              onChange={e => { setAddText(e.target.value); setAddError(''); }}
-              className="w-full border-2 border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 ring-[#8090C0] focus:border-transparent"
-            />
-            <input
-              type="text"
-              placeholder="例句（可选）"
-              value={addExample}
-              onChange={e => setAddExample(e.target.value)}
-              className="w-full border-2 border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 ring-[#8090C0] focus:border-transparent"
-            />
-            {addError && <p className="text-red-500 text-xs">{addError}</p>}
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setShowAddForm(false); setAddText(''); setAddExample(''); setAddError(''); }}
-                className="flex-1 py-2 rounded-xl border-2 border-stone-200 text-stone-600 text-sm font-semibold"
-              >
-                取消
-              </button>
-              <button
-                onClick={handleAddWord}
-                className="flex-1 py-2 rounded-xl bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] text-white text-sm font-bold"
-              >
-                确认添加
-              </button>
-            </div>
+            {foundWordData ? (
+              <>
+                <div className="text-sm font-semibold text-stone-700">
+                  「{addText.trim()}」在{' '}
+                  <span className="text-[#5868A8]">{foundWordData.location}</span>{' '}
+                  中已有
+                </div>
+                <div className="text-xs text-stone-500">
+                  拼音：{getDisplayPinyin(foundWordData.word.text, foundWordData.word.pinyin)}
+                </div>
+                {foundWordData.word.example && (
+                  <div className="text-xs text-stone-500 italic line-clamp-2">
+                    例：{foundWordData.word.example}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setFoundWordData(null)}
+                    className="flex-1 py-2 rounded-xl border-2 border-stone-200 text-stone-600 text-sm font-semibold"
+                  >
+                    自行填写
+                  </button>
+                  <button
+                    onClick={() =>
+                      commitAddWord(
+                        foundWordData.word.text,
+                        foundWordData.word.example,
+                        foundWordData.word.pinyin,
+                      )
+                    }
+                    className="flex-1 py-2 rounded-xl bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] text-white text-sm font-bold"
+                  >
+                    使用词库数据
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder="词语（必填）"
+                  value={addText}
+                  onChange={e => { setAddText(e.target.value); setAddError(''); }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddWord(); }}
+                  className="w-full border-2 border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 ring-[#8090C0] focus:border-transparent"
+                />
+                <input
+                  type="text"
+                  placeholder="例句（可选）"
+                  value={addExample}
+                  onChange={e => setAddExample(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddWord(); }}
+                  className="w-full border-2 border-stone-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 ring-[#8090C0] focus:border-transparent"
+                />
+                {addError && <p className="text-red-500 text-xs">{addError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setAddText('');
+                      setAddExample('');
+                      setAddError('');
+                      setFoundWordData(null);
+                    }}
+                    className="flex-1 py-2 rounded-xl border-2 border-stone-200 text-stone-600 text-sm font-semibold"
+                  >
+                    取消
+                  </button>
+                  <button
+                    onClick={handleAddWord}
+                    className="flex-1 py-2 rounded-xl bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] text-white text-sm font-bold"
+                  >
+                    确认添加
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
