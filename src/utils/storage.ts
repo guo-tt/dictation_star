@@ -377,3 +377,51 @@ export function unhideWordFromLesson(listId: string, wordId: string): void {
   all[listId] = (all[listId] ?? []).filter(id => id !== wordId);
   localStorage.setItem(LESSON_HIDDEN_KEY, JSON.stringify(all));
 }
+
+// ── 作文常错字 list ────────────────────────────────────────────────────────────
+
+export const ZUOWEN_LIST_ID = 'clist-zuowen-fixed';
+
+export function getOrCreateZuowenList(): CustomListMeta {
+  const all = getCustomLists();
+  const existing = all.find(l => l.id === ZUOWEN_LIST_ID);
+  if (existing) return existing;
+  const entry: CustomListMeta = {
+    id: ZUOWEN_LIST_ID,
+    name: '作文常错字',
+    subject: 'chinese',
+    createdAt: new Date().toISOString(),
+  };
+  all.push(entry);
+  localStorage.setItem(CUSTOM_LISTS_KEY, JSON.stringify(all));
+  return entry;
+}
+
+export function findWordDataInBanks(
+  text: string,
+  subject: Subject,
+  excludeListId?: string,
+): { location: string; word: Word } | null {
+  const needle = text.trim().toLowerCase();
+
+  for (const list of presetWordLists) {
+    if (list.subject !== subject) continue;
+    const found = list.words.find(w => w.text.toLowerCase() === needle);
+    if (found) {
+      return { location: `${list.name}${list.lessonTitle ?? ''}`, word: found };
+    }
+  }
+
+  const entries = loadCustomEntries();
+  const customLists = getCustomLists();
+  for (const entry of entries) {
+    if (entry.subject !== subject) continue;
+    if (excludeListId && entry.listId === excludeListId) continue;
+    if (entry.word.text.toLowerCase() === needle) {
+      const listName = customLists.find(l => l.id === entry.listId)?.name ?? '自定义课';
+      return { location: listName, word: entry.word };
+    }
+  }
+
+  return null;
+}
