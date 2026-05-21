@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
+import { Pencil } from 'lucide-react';
 import { presetWordLists } from '../data/wordLists';
 import { getWordStats } from '../utils/storage';
 
 interface LessonSelectorViewProps {
   onSelectLesson: (lessonId: string) => void;
+  onEditLesson: (lessonId: string) => void;
 }
 
 const GRADE_TABS = [
@@ -11,7 +13,7 @@ const GRADE_TABS = [
   { value: 6, label: '六年级' },
 ] as const;
 
-export default function LessonSelectorView({ onSelectLesson }: LessonSelectorViewProps) {
+export default function LessonSelectorView({ onSelectLesson, onEditLesson }: LessonSelectorViewProps) {
   const [gradeTab, setGradeTab] = useState<5 | 6>(5);
 
   const lessonLists = useMemo(() => {
@@ -48,37 +50,45 @@ export default function LessonSelectorView({ onSelectLesson }: LessonSelectorVie
           const pct = total > 0 ? Math.round((practiced / total) * 100) : 0;
 
           return (
-            <button
-              key={list.id}
-              onClick={() => onSelectLesson(list.id)}
-              className="w-full rounded-2xl p-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-xs font-bold text-stone-500">
-                    {list.lesson}
-                  </span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-sm text-stone-800">
-                    {list.name} {list.lessonTitle}
+            <div key={list.id} className="flex items-stretch gap-2">
+              <button
+                onClick={() => onSelectLesson(list.id)}
+                className="flex-1 rounded-2xl p-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-stone-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-bold text-stone-500">
+                      {list.lesson}
+                    </span>
                   </div>
-                  <div className="text-xs text-stone-400 mt-0.5">{total} 个词语</div>
-                  {total > 0 && (
-                    <div className="mt-1.5 flex items-center gap-2">
-                      <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-[#8090C0] rounded-full"
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-stone-400 flex-shrink-0">{practiced}/{total}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm text-stone-800">
+                      {list.name} {list.lessonTitle}
                     </div>
-                  )}
+                    <div className="text-xs text-stone-400 mt-0.5">{total} 个词语</div>
+                    {total > 0 && (
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <div className="flex-1 h-1 bg-stone-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-[#8090C0] rounded-full"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-stone-400 flex-shrink-0">{practiced}/{total}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-stone-300 text-lg">›</div>
                 </div>
-                <div className="text-stone-300 text-lg">›</div>
-              </div>
-            </button>
+              </button>
+              <button
+                onClick={() => onEditLesson(list.id)}
+                className="px-3 rounded-2xl border-2 border-stone-200 bg-white text-stone-400 hover:text-[#8090C0] hover:border-[#B0BCDC] transition flex items-center"
+                aria-label="编辑课词"
+              >
+                <Pencil size={16} />
+              </button>
+            </div>
           );
         })}
       </div>
