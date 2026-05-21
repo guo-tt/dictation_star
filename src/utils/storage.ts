@@ -418,7 +418,7 @@ export function findWordDataInBanks(
     if (entry.subject !== subject) continue;
     if (excludeListId && entry.listId === excludeListId) continue;
     if (entry.word.text.toLowerCase() === needle) {
-      const listName = customLists.find(l => l.id === entry.listId)?.name ?? '自定义课';
+      const listName = customLists.find(l => l.id === entry.listId)?.name ?? '未知课';
       return { location: listName, word: entry.word };
     }
   }

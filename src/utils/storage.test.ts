@@ -141,8 +141,8 @@ describe('findWordDataInBanks', () => {
     expect(result).toBeNull();
   });
 
-  it('matches case-insensitively', () => {
-    const list = addCustomList('英文课', 'chinese');
+  it('finds word regardless of surrounding whitespace in the search text', () => {
+    const list = addCustomList('测试课2', 'chinese');
     const word: Word = {
       id: 'tw-3',
       text: '美丽',
@@ -152,6 +152,6 @@ describe('findWordDataInBanks', () => {
     };
     addCustomWord(word, list.id, 'chinese');
 
-    expect(findWordDataInBanks('美丽', 'chinese')).not.toBeNull();
+    expect(findWordDataInBanks('  美丽  ', 'chinese')).not.toBeNull();
   });
 });
