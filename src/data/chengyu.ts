@@ -134,7 +134,7 @@ export const chengyuList: ChengYu[] = [
     text: "一模一样",
     examples: [
       { grade: 3, lesson: 13, sentence: "天桥上面会种满花草树木，跟我们原本住的环境一模一样。" },
-      { grade: 6, lesson: 11, sentence: "那个人抬起头，你发现他竟然长得跟你一摸一样。" },
+      { grade: 6, lesson: 11, sentence: "那个人抬起头，你发现他竟然长得跟你一模一样。" },
     ],
   },
   {
@@ -298,7 +298,7 @@ export const chengyuList: ChengYu[] = [
     text: "自言自语",
     examples: [
       { grade: 4, lesson: 13, sentence: "“怎么扛走金箍棒呢？”孙悟空摸着金箍棒自言自语。" },
-      { grade: 6, lesson: 5, sentence: "”剑明明hi从这里掉下去的，怎么就捞不到了呢？简直太奇怪了！他自言自语地说。" },
+      { grade: 6, lesson: 5, sentence: "”剑明明从这里掉下去的，怎么就捞不到了呢？简直太奇怪了！他自言自语地说。" },
     ],
   },
   {
