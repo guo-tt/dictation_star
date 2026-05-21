@@ -9,7 +9,8 @@ import StudyView from './components/StudyView';
 import StudyListView from './components/StudyListView';
 import SearchModal from './components/SearchModal';
 import BottomToolbar from './components/BottomToolbar';
-import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords } from './utils/storage';
+import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords, getCustomListsForGrade, getCustomWordsForList } from './utils/storage';
+import LessonEditView from './components/LessonEditView';
 import { presetWordLists } from './data/wordLists';
 
 ensureFreshInstall();
@@ -38,6 +39,8 @@ export default function App() {
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [sessionConfig, setSessionConfig] = useState<SessionConfig | null>(null);
   const [dictationKey, setDictationKey] = useState(0);
+
+  const [editingListId, setEditingListId] = useState<string | null>(null);
 
   // Study mode state
   const [studyWords, setStudyWords] = useState<Word[]>([]);
@@ -97,6 +100,30 @@ export default function App() {
     setView('studyList');
   }
 
+  function openLessonEdit(listId: string) {
+    setEditingListId(listId);
+    setView('lessonEdit');
+  }
+
+  function openCustomLessonDictation(listId: string, lessonName: string, mode: DictationMode) {
+    const words = getCustomWordsForList(listId);
+    if (words.length === 0) return;
+    setDictationMode(mode);
+    setSessionConfig({ words, grade: lessonName });
+    setDictationKey(k => k + 1);
+    setView('dictation');
+  }
+
+  function openGradeDictation(gradeId: string, gradeName: string, mode: DictationMode) {
+    const lessons = getCustomListsForGrade(gradeId);
+    const words = lessons.flatMap(l => getCustomWordsForList(l.id));
+    if (words.length === 0) return;
+    setDictationMode(mode);
+    setSessionConfig({ words, grade: gradeName });
+    setDictationKey(k => k + 1);
+    setView('dictation');
+  }
+
   function handleLessonSelected(lessonId: string) {
     if (lessonSelectorMode === 'study') {
       const list = presetWordLists.find(l => l.id === lessonId);
@@ -133,6 +160,10 @@ export default function App() {
   }
 
   function handleBack() {
+    if (view === 'lessonEdit') {
+      setView('wordlists');
+      return;
+    }
     if (view === 'wordSelector' && selectorMode === 'lesson') {
       setView('lessonSelector');
     } else if (view === 'studyList' && studyOrigin === 'lessonSelector') {
@@ -146,6 +177,7 @@ export default function App() {
   const headerTitle =
     view === 'wordlists' ? '听写小状元'
     : view === 'lessonSelector' ? (lessonSelectorMode === 'study' ? '选择课次（学习）' : '选择课次')
+    : view === 'lessonEdit' ? '编辑课词'
     : view === 'wordSelector' ? '选择词语'
     : view === 'studyList' ? `学习：${studyTitle}`
     : view === 'study' ? `学习：${selectedList?.name ?? ''}`
@@ -153,7 +185,8 @@ export default function App() {
     : selectedList?.name ?? '听写';
 
   const headerBack =
-    view === 'dictation' || view === 'study' || view === 'wordSelector' || view === 'lessonSelector' || view === 'studyList'
+    view === 'dictation' || view === 'study' || view === 'wordSelector' ||
+    view === 'lessonSelector' || view === 'studyList' || view === 'lessonEdit'
       ? handleBack
       : undefined;
 
@@ -172,10 +205,19 @@ export default function App() {
             onOpenLessonSelector={openLessonSelector}
             onOpenStudyGrade={openStudyGrade}
             onOpenStudyLessonSelector={openStudyLessonSelector}
+            onEditLesson={openLessonEdit}
+            onStartCustomLesson={openCustomLessonDictation}
+            onStartGradeDictation={openGradeDictation}
           />
         )}
         {view === 'lessonSelector' && (
-          <LessonSelectorView onSelectLesson={handleLessonSelected} />
+          <LessonSelectorView
+            onSelectLesson={handleLessonSelected}
+            onEditLesson={openLessonEdit}
+          />
+        )}
+        {view === 'lessonEdit' && editingListId && (
+          <LessonEditView listId={editingListId} onBack={handleBack} />
         )}
         {view === 'wordSelector' && (
           <WordSelectorView
