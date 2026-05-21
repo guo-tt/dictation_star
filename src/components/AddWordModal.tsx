@@ -4,6 +4,23 @@ import { pinyin } from 'pinyin-pro';
 import { Subject, Word, WordType, WordList } from '../types';
 import { addCustomWord } from '../utils/storage';
 
+type MatchType = 'exact' | 'similar' | 'none';
+
+function normalize(s: string) {
+  return s.trim().toLowerCase().replace(/\s+/g, '');
+}
+
+function checkSimilarity(input: string, allTexts: string[]): { type: MatchType; matched?: string } {
+  const n = normalize(input);
+  for (const t of allTexts) {
+    if (t === n) return { type: 'exact', matched: t };
+  }
+  for (const t of allTexts) {
+    if (t.includes(n) || n.includes(t)) return { type: 'similar', matched: t };
+  }
+  return { type: 'none' };
+}
+
 interface AddWordModalProps {
   subject: Subject;
   lists: WordList[];
@@ -62,6 +79,11 @@ export default function AddWordModal({
 
   const isSentenceMode = isChinese && inputMode === 'sentence';
 
+  const allExistingTexts = useMemo(
+    () => lists.flatMap(l => l.words.map(w => normalize(w.text))),
+    [lists],
+  );
+
   const parsed = useMemo<ParsedItem[]>(() => {
     if (!rawInput.trim()) return [];
     return isSentenceMode
@@ -73,7 +95,11 @@ export default function AddWordModal({
     e.preventDefault();
     if (parsed.length === 0) { setError('请输入内容'); return; }
 
+    let added = 0;
     parsed.forEach((item, i) => {
+      // skip exact duplicates; allow similar (different enough to be intentional)
+      if (!isSentenceMode && checkSimilarity(item.text, allExistingTexts).type === 'exact') return;
+
       const wordType: WordType = isSentenceMode
         ? 'sentence'
         : isChinese
@@ -84,13 +110,15 @@ export default function AddWordModal({
         id: `custom-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`,
         text: item.text,
         pinyin: item.pinyin || undefined,
-        example: item.example || item.text,
+        example: item.example,
         wordType,
         isCustom: true,
       };
       addCustomWord(word, listId, subject);
+      added++;
     });
 
+    if (added === 0) { setError('所有词语已存在于词单中，未添加任何内容'); return; }
     onAdded();
     onClose();
   }
@@ -195,25 +223,33 @@ export default function AddWordModal({
                 预览 · {parsed.length} 条
               </p>
               <div className="flex flex-col gap-1.5">
-                {parsed.map((item, i) => (
-                  <div key={i} className="flex items-start gap-2 text-sm">
-                    <span className="text-stone-400 text-xs w-5 text-right flex-shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-stone-800">{item.text}</span>
-                      {item.pinyin && (
-                        <span className="text-stone-400 text-xs ml-1.5">{item.pinyin}</span>
-                      )}
-                      {item.example && item.example !== item.text && (
-                        <span className="text-stone-500 text-xs ml-1.5">— {item.example}</span>
-                      )}
-                      {!item.example && !isSentenceMode && (
-                        <span className="text-amber-400 text-xs ml-1.5">（无例句）</span>
-                      )}
+                {parsed.map((item, i) => {
+                  const match = isSentenceMode ? { type: 'none' as MatchType } : checkSimilarity(item.text, allExistingTexts);
+                  return (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <span className="text-stone-400 text-xs w-5 text-right flex-shrink-0 mt-0.5">
+                        {i + 1}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className={`font-medium ${match.type === 'exact' ? 'text-stone-400 line-through' : 'text-stone-800'}`}>
+                          {item.text}
+                        </span>
+                        {item.pinyin && match.type !== 'exact' && (
+                          <span className="text-stone-400 text-xs ml-1.5">{item.pinyin}</span>
+                        )}
+                        {match.type === 'exact' && (
+                          <span className="text-xs ml-1.5 text-red-400 font-medium">已存在，将跳过</span>
+                        )}
+                        {match.type === 'similar' && (
+                          <span className="text-xs ml-1.5 text-amber-500 font-medium">相似词：{match.matched}</span>
+                        )}
+                        {match.type === 'none' && item.example && item.example !== item.text && (
+                          <span className="text-stone-500 text-xs ml-1.5">— {item.example}</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -230,7 +266,9 @@ export default function AddWordModal({
               className={`w-full border-2 rounded-xl px-4 py-2.5 outline-none transition focus:ring-2 ${accentRing} border-stone-200 focus:border-transparent bg-white`}
             >
               {lists.filter(l => !l.isVirtual).map(l => (
-                <option key={l.id} value={l.id}>{l.name}</option>
+                <option key={l.id} value={l.id}>
+                  {l.id.startsWith('clist-') && l.grade ? `[${l.grade}年级] ` : ''}{l.name}
+                </option>
               ))}
             </select>
           </div>

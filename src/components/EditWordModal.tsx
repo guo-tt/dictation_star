@@ -16,6 +16,15 @@ function autoPinyin(text: string): string {
   catch { return ''; }
 }
 
+function speakText(text: string) {
+  if (!text || !('speechSynthesis' in window)) return;
+  window.speechSynthesis.cancel();
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.lang = 'zh-CN';
+  utter.rate = 0.8;
+  window.speechSynthesis.speak(utter);
+}
+
 export default function EditWordModal({ word, subject, onClose, onSaved }: EditWordModalProps) {
   const isChinese = subject === 'chinese';
 
@@ -36,7 +45,7 @@ export default function EditWordModal({ word, subject, onClose, onSaved }: EditW
     if (!text.trim()) return;
     const updates: Partial<Word> = {
       text: text.trim(),
-      example: example.trim() || text.trim(),
+      example: example.trim(),
       pinyin: isChinese ? pinyinVal.trim() || undefined : undefined,
       exampleMeaning: exampleMeaning.trim() || undefined,
     };
@@ -90,7 +99,18 @@ export default function EditWordModal({ word, subject, onClose, onSaved }: EditW
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-stone-600 mb-1">例句</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-sm font-semibold text-stone-600">例句 <span className="font-normal text-stone-400">（可选）</span></label>
+              {example.trim() && (
+                <button
+                  type="button"
+                  onClick={() => speakText(example)}
+                  className="text-xs text-[#8090C0] hover:text-[#5868A8] flex items-center gap-1"
+                >
+                  ▶ 试听
+                </button>
+              )}
+            </div>
             <textarea
               rows={3}
               value={example}
