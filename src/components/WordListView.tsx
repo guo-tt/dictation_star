@@ -4,6 +4,7 @@ import { DictationMode, GradeFilter, CustomGrade, CustomListMeta } from '../type
 import {
   getCustomGrades, addCustomGrade, deleteCustomGrade,
   addCustomList, getCustomListsForGrade, deleteCustomList,
+  ZUOWEN_LIST_ID, getOrCreateZuowenList, getCustomWordsForList,
 } from '../utils/storage';
 
 interface WordListViewProps {
@@ -138,6 +139,35 @@ export default function WordListView({
               >
                 <div className="text-base font-bold text-stone-700">六年级</div>
                 <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
+              </button>
+            </div>
+          </div>
+
+          {/* 作文常错字库 card */}
+          <div className="rounded-2xl border-2 border-[#B0BCDC] bg-[#F0F2FB] px-4 py-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl leading-none">📝</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-base font-bold text-[#5868A8]">作文常错字库</div>
+                <div className="text-xs text-[#8090C0] mt-0.5">收集作文里写错的字词，随时听写复习</div>
+                <div className="text-xs text-stone-400 mt-1">
+                  {getCustomWordsForList(ZUOWEN_LIST_ID).length} 个词
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => onStartCustomLesson(ZUOWEN_LIST_ID, '作文常错字', dictationMode)}
+                disabled={getCustomWordsForList(ZUOWEN_LIST_ID).length === 0}
+                className="flex-1 py-2 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                开始听写
+              </button>
+              <button
+                onClick={() => { getOrCreateZuowenList(); onEditLesson(ZUOWEN_LIST_ID); }}
+                className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 border-[#B0BCDC] text-[#5868A8] bg-white transition"
+              >
+                编辑词库
               </button>
             </div>
           </div>
