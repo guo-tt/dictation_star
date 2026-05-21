@@ -1,9 +1,20 @@
-import { WordRecord, CustomWordEntry, CustomListMeta, Word, Subject } from '../types';
+import { WordRecord, CustomWordEntry, CustomListMeta, Word, Subject, CustomGrade } from '../types';
 import { findWordInPresets, presetWordLists } from '../data/wordLists';
-import { syncRecord, syncSettings, syncCustomData } from './cloudSync';
 
 const RECORDS_KEY = 'dictation_v1';
 const CUSTOM_KEY = 'dictation_custom_v1';
+
+// Clears all dictation_* localStorage keys on first run of this App Store build,
+// so devices with leftover dev/TestFlight data start clean.
+const FRESH_KEY = 'dictation_appstore_v1';
+export function ensureFreshInstall(): void {
+  if (!localStorage.getItem(FRESH_KEY)) {
+    Object.keys(localStorage)
+      .filter(k => k.startsWith('dictation_') && k !== FRESH_KEY)
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(FRESH_KEY, '1');
+  }
+}
 
 const MAX_RECENT = 50;
 
@@ -42,6 +53,12 @@ export function clearAllRecords(): void {
   localStorage.setItem(RECORDS_KEY, JSON.stringify({}));
 }
 
+export function clearWordsRecords(wordIds: string[]): void {
+  const records = getAllRecords();
+  for (const id of wordIds) delete records[id];
+  localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
+}
+
 export function getAllRecords(): Record<string, WordRecord> {
   try {
     const raw = JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}');
@@ -67,7 +84,6 @@ export function saveAttempt(wordId: string, correct: boolean): void {
   }
 
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
-  void syncRecord(wordId, records[wordId]);
 }
 
 export interface WordStats {
@@ -174,13 +190,11 @@ export function addCustomWord(word: Word, listId: string, subject: Subject): voi
   };
   entries.push(entry);
   saveCustomEntries(entries);
-  void syncCustomData(getCustomLists(), entries);
 }
 
 export function deleteCustomWord(wordId: string): void {
   const entries = loadCustomEntries().filter(e => e.word.id !== wordId);
   saveCustomEntries(entries);
-  void syncCustomData(getCustomLists(), entries);
 }
 
 export function updateCustomWord(wordId: string, updates: Partial<Word>): void {
@@ -189,7 +203,6 @@ export function updateCustomWord(wordId: string, updates: Partial<Word>): void {
   if (idx === -1) return;
   entries[idx].word = { ...entries[idx].word, ...updates };
   saveCustomEntries(entries);
-  void syncCustomData(getCustomLists(), entries);
 }
 
 // ── preset word overrides & hidden words ──────────────────────────────────────
@@ -244,18 +257,18 @@ export function getCustomLists(subject?: Subject): CustomListMeta[] {
   }
 }
 
-export function addCustomList(name: string, subject: Subject, grade?: number): CustomListMeta {
+export function addCustomList(name: string, subject: Subject, grade?: number, gradeId?: string): CustomListMeta {
   const all = getCustomLists();
   const entry: CustomListMeta = {
-    id: `clist-${Date.now()}`,
+    id: `clist-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
     name: name.trim(),
     subject,
     grade,
+    gradeId,
     createdAt: new Date().toISOString(),
   };
   all.push(entry);
   localStorage.setItem(CUSTOM_LISTS_KEY, JSON.stringify(all));
-  void syncCustomData(all, loadCustomEntries());
   return entry;
 }
 
@@ -263,10 +276,8 @@ export function deleteCustomList(id: string): void {
   // Remove list meta
   const lists = getCustomLists().filter(l => l.id !== id);
   localStorage.setItem(CUSTOM_LISTS_KEY, JSON.stringify(lists));
-  // Remove all custom words belonging to this list
   const words = loadCustomEntries().filter(e => e.listId !== id);
   saveCustomEntries(words);
-  void syncCustomData(lists, words);
 }
 
 // Preset lists that the user has chosen to hide
@@ -283,12 +294,86 @@ export function hidePresetList(id: string): void {
   if (!hidden.includes(id)) {
     hidden.push(id);
     localStorage.setItem(HIDDEN_LISTS_KEY, JSON.stringify(hidden));
-    void syncSettings(hidden);
   }
 }
 
 export function unhidePresetList(id: string): void {
   const hidden = getHiddenListIds().filter(h => h !== id);
   localStorage.setItem(HIDDEN_LISTS_KEY, JSON.stringify(hidden));
-  void syncSettings(hidden);
+}
+
+// ── custom grades ─────────────────────────────────────────────────────────────
+
+const CUSTOM_GRADES_KEY = 'dictation_custom_grades_v1';
+const LESSON_HIDDEN_KEY = 'dictation_lesson_hidden_v1';
+
+export function getCustomGrades(): CustomGrade[] {
+  try { return JSON.parse(localStorage.getItem(CUSTOM_GRADES_KEY) || '[]'); }
+  catch { return []; }
+}
+
+export function addCustomGrade(name: string, subject: Subject): CustomGrade {
+  const grades = getCustomGrades();
+  const grade: CustomGrade = {
+    id: `cgrade-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    name: name.trim(),
+    subject,
+    createdAt: new Date().toISOString(),
+  };
+  grades.push(grade);
+  localStorage.setItem(CUSTOM_GRADES_KEY, JSON.stringify(grades));
+  return grade;
+}
+
+export function deleteCustomGrade(id: string): void {
+  const grades = getCustomGrades().filter(g => g.id !== id);
+  localStorage.setItem(CUSTOM_GRADES_KEY, JSON.stringify(grades));
+  // Also delete all lessons belonging to this grade
+  const lists = getCustomLists().filter(l => l.gradeId !== id);
+  localStorage.setItem(CUSTOM_LISTS_KEY, JSON.stringify(lists));
+  // Also delete all words in those orphaned lessons
+  const remainingListIds = new Set(lists.map(l => l.id));
+  const words = loadCustomEntries().filter(e => remainingListIds.has(e.listId));
+  saveCustomEntries(words);
+}
+
+export function updateCustomGrade(id: string, name: string): void {
+  const grades = getCustomGrades().map(g =>
+    g.id === id ? { ...g, name: name.trim() } : g,
+  );
+  localStorage.setItem(CUSTOM_GRADES_KEY, JSON.stringify(grades));
+}
+
+export function getCustomListsForGrade(gradeId: string): CustomListMeta[] {
+  return getCustomLists().filter(l => l.gradeId === gradeId);
+}
+
+// ── lesson-scoped word hiding ──────────────────────────────────────────────────
+
+export function getHiddenWordsForLesson(listId: string): string[] {
+  try {
+    const all: Record<string, string[]> = JSON.parse(localStorage.getItem(LESSON_HIDDEN_KEY) || '{}');
+    return all[listId] ?? [];
+  } catch { return []; }
+}
+
+export function hideWordFromLesson(listId: string, wordId: string): void {
+  const all: Record<string, string[]> = (() => {
+    try { return JSON.parse(localStorage.getItem(LESSON_HIDDEN_KEY) || '{}'); }
+    catch { return {}; }
+  })();
+  const current = all[listId] ?? [];
+  if (!current.includes(wordId)) {
+    all[listId] = [...current, wordId];
+    localStorage.setItem(LESSON_HIDDEN_KEY, JSON.stringify(all));
+  }
+}
+
+export function unhideWordFromLesson(listId: string, wordId: string): void {
+  const all: Record<string, string[]> = (() => {
+    try { return JSON.parse(localStorage.getItem(LESSON_HIDDEN_KEY) || '{}'); }
+    catch { return {}; }
+  })();
+  all[listId] = (all[listId] ?? []).filter(id => id !== wordId);
+  localStorage.setItem(LESSON_HIDDEN_KEY, JSON.stringify(all));
 }
