@@ -3,6 +3,7 @@ import { Volume2, BookOpen, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
 import { Word, DictationMode, Subject } from '../types';
 import { saveAttempt, getWordStats, deleteCustomWord, clearWordRecord } from '../utils/storage';
 import { playSound } from '../utils/sound';
+import { getDisplayPinyin } from '../utils/pinyin';
 import EditWordModal from './EditWordModal';
 
 interface WordCardProps {
@@ -61,7 +62,9 @@ export default function WordCard({ word, index, dictationMode, subject, onAttemp
   }, [word.id, onAttempt, localWord]);
 
   function playWord() { speak(localWord.text, lang); }
-  function playExample() { speak(localWord.example, lang); }
+  function playExample() {
+    if (localWord.example) speak(localWord.example, lang);
+  }
 
   function handleDelete() {
     deleteCustomWord(localWord.id);
@@ -123,8 +126,10 @@ export default function WordCard({ word, index, dictationMode, subject, onAttemp
                       </span>
                     )}
                   </div>
-                  {localWord.pinyin && (
-                    <div className="text-sm text-stone-400 mt-0.5 font-medium">{localWord.pinyin}</div>
+                  {showText && (
+                    <div className="text-sm text-stone-400 mt-0.5 font-medium">
+                      {getDisplayPinyin(localWord.text, localWord.pinyin)}
+                    </div>
                   )}
                   {localWord.meaning && (
                     <div className="text-xs text-stone-500 mt-1">{localWord.meaning}</div>
@@ -200,13 +205,15 @@ export default function WordCard({ word, index, dictationMode, subject, onAttemp
             <Volume2 size={16} />
             <span>朗读</span>
           </button>
-          <button
-            onClick={playExample}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-600 hover:bg-stone-700 active:bg-stone-800 text-white text-sm font-medium transition-colors shadow-sm"
-          >
-            <BookOpen size={16} />
-            <span>例句</span>
-          </button>
+          {localWord.example && (
+            <button
+              onClick={playExample}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-600 hover:bg-stone-700 active:bg-stone-800 text-white text-sm font-medium transition-colors shadow-sm"
+            >
+              <BookOpen size={16} />
+              <span>例句</span>
+            </button>
+          )}
         </div>
 
         {/* Example sentence preview (in parent mode) */}
