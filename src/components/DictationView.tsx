@@ -48,6 +48,7 @@ export default function DictationView({
   }, []);
 
   function handleComplete() {
+    if (showCompletion) return;
     sessionMarks.forEach((correct, wordId) => {
       saveAttempt(wordId, correct);
     });
