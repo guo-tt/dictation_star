@@ -9,7 +9,7 @@ import StudyView from './components/StudyView';
 import StudyListView from './components/StudyListView';
 import SearchModal from './components/SearchModal';
 import BottomToolbar from './components/BottomToolbar';
-import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords, getCustomListsForGrade, getCustomWordsForList } from './utils/storage';
+import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords, clearAllRecords, getCustomListsForGrade, getCustomWordsForList } from './utils/storage';
 import LessonEditView from './components/LessonEditView';
 import { presetWordLists } from './data/wordLists';
 import ChengYuStudyView from './components/ChengYuStudyView';
@@ -233,6 +233,7 @@ export default function App() {
             onStartGradeDictation={openGradeDictation}
             onStartChengyuDictation={startChengyuDictation}
             onStartChengyuStudy={startChengyuStudy}
+            onResetAll={clearAllRecords}
           />
         )}
         {view === 'lessonSelector' && (

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ChevronRight, Pencil, Trash2, BookOpen } from 'lucide-react';
 import { DictationMode, GradeFilter, CustomGrade, CustomListMeta, Word } from '../types';
-import ChengYuPanel from './ChengYuPanel';
 import type { ChengYu } from '../data/chengyu';
+import { chengyuList, chengyuToWords } from '../data/chengyu';
 import {
   getCustomGrades, addCustomGrade, deleteCustomGrade,
   addCustomList, getCustomListsForGrade, deleteCustomList,
@@ -19,6 +19,18 @@ interface WordListViewProps {
   onStartGradeDictation: (gradeId: string, gradeName: string, mode: DictationMode) => void;
   onStartChengyuDictation: (words: Word[], label: string, mode: DictationMode) => void;
   onStartChengyuStudy: (list: ChengYu[], label: string) => void;
+  onResetAll: () => void;
+}
+
+type ActiveSection = 'grade' | 'chengyu' | 'zuowen' | null;
+type ChengyuGrade = 3 | 4 | 5 | 6;
+const CHENGYU_GRADES: ChengyuGrade[] = [3, 4, 5, 6];
+
+function getGradeWordCount(gradeId: string): number {
+  return getCustomListsForGrade(gradeId).reduce(
+    (sum, list) => sum + getCustomWordsForList(list.id).length,
+    0,
+  );
 }
 
 export default function WordListView({
@@ -31,10 +43,18 @@ export default function WordListView({
   onStartGradeDictation,
   onStartChengyuDictation,
   onStartChengyuStudy,
+  onResetAll,
 }: WordListViewProps) {
-  const [mainTab, setMainTab] = useState<'dictation' | 'study' | 'chengyu'>('dictation');
+  const [mainTab, setMainTab] = useState<'dictation' | 'study'>('dictation');
   const [dictationMode, setDictationMode] = useState<DictationMode>('parent');
+  const [activeSection, setActiveSection] = useState<ActiveSection>(null);
 
+  // Chengyu grade multi-select (all selected by default)
+  const [chengyuGrades, setChengyuGrades] = useState<Set<ChengyuGrade>>(
+    () => new Set(CHENGYU_GRADES),
+  );
+
+  // Custom grades state
   const [grades, setGrades] = useState<CustomGrade[]>(() => getCustomGrades());
   const [expandedGradeId, setExpandedGradeId] = useState<string | null>(null);
   const [gradeLessons, setGradeLessons] = useState<CustomListMeta[]>([]);
@@ -42,12 +62,42 @@ export default function WordListView({
   const [showNewGradeInput, setShowNewGradeInput] = useState(false);
   const [newLessonName, setNewLessonName] = useState('');
   const [showNewLessonInput, setShowNewLessonInput] = useState(false);
+  const [showConfirmReset, setShowConfirmReset] = useState(false);
 
   useEffect(() => {
     if (expandedGradeId) {
       setGradeLessons(getCustomListsForGrade(expandedGradeId));
     }
   }, [expandedGradeId]);
+
+  function toggleSection(section: ActiveSection) {
+    setActiveSection(prev => (prev === section ? null : section));
+  }
+
+  function toggleChengyuGrade(g: ChengyuGrade) {
+    setChengyuGrades(prev => {
+      const next = new Set(prev);
+      if (next.has(g)) {
+        if (next.size === 1) return prev; // keep at least one
+        next.delete(g);
+      } else {
+        next.add(g);
+      }
+      return next;
+    });
+  }
+
+  function getSelectedChengyu(): ChengYu[] {
+    if (chengyuGrades.size === CHENGYU_GRADES.length) return chengyuList;
+    return chengyuList.filter(cy =>
+      cy.examples.some(e => chengyuGrades.has(e.grade as ChengyuGrade)),
+    );
+  }
+
+  function getChengyuLabel(): string {
+    if (chengyuGrades.size === CHENGYU_GRADES.length) return '全部';
+    return [...chengyuGrades].sort().map(g => `P${g}`).join('+');
+  }
 
   function handleAddGrade() {
     if (!newGradeName.trim()) return;
@@ -79,15 +129,24 @@ export default function WordListView({
     if (expandedGradeId) setGradeLessons(getCustomListsForGrade(expandedGradeId));
   }
 
-  return (
-    <div className="flex flex-col h-full px-4 py-5 gap-4">
+  const zuowenCount = getCustomWordsForList(ZUOWEN_LIST_ID).length;
+  const customGradesWithWords = grades.filter(g => getGradeWordCount(g.id) > 0);
 
-      {/* Main tab switcher */}
+  const sectionCardClass = (section: ActiveSection) =>
+    `flex-1 rounded-2xl px-3 py-4 text-left border-2 transition active:scale-[0.98] ${
+      activeSection === section
+        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+        : 'bg-white border-stone-200 text-stone-700'
+    }`;
+
+  return (
+    <div className="flex flex-col h-full px-4 py-5 gap-4 overflow-y-auto">
+
+      {/* Tab switcher */}
       <div className="flex gap-2 flex-shrink-0">
         {([
           { value: 'dictation' as const, label: '听写' },
           { value: 'study' as const, label: '学习' },
-          { value: 'chengyu' as const, label: '成语' },
         ]).map(tab => (
           <button
             key={tab.value}
@@ -105,7 +164,7 @@ export default function WordListView({
 
       {mainTab === 'dictation' && (
         <>
-          {/* Parent / Student toggle */}
+          {/* Mode toggle */}
           <div className="flex gap-2">
             {([
               { value: 'parent' as DictationMode, label: '👨‍👩‍👧 家长模式', desc: '显示文字' },
@@ -126,67 +185,159 @@ export default function WordListView({
             ))}
           </div>
 
-          {/* Dictation entry buttons */}
-          <div className="flex flex-col gap-3">
-            <button
-              onClick={() => onOpenLessonSelector(dictationMode)}
-              className="rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
-            >
-              <div className="text-base font-bold text-[#5868A8]">按课听写</div>
-              <div className="text-xs text-[#8090C0] mt-0.5">选年级→选课</div>
+          {/* 按课听写 */}
+          <button
+            onClick={() => onOpenLessonSelector(dictationMode)}
+            className="rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
+          >
+            <div className="text-base font-bold text-[#5868A8]">按课听写</div>
+            <div className="text-xs text-[#8090C0] mt-0.5">选年级 → 选课</div>
+          </button>
+
+          {/* 三栏入口 */}
+          <div className="flex gap-2">
+            <button className={sectionCardClass('grade')} onClick={() => toggleSection('grade')}>
+              <div className="text-sm font-bold">按年级选词</div>
+              <div className="text-xs opacity-60 mt-0.5">五六年级及自定义</div>
             </button>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => onOpenMixedSelector(5, dictationMode)}
-                className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-              >
-                <div className="text-base font-bold text-stone-700">五年级</div>
-                <div className="text-xs text-stone-400 mt-0.5">全部五年级词语</div>
-              </button>
-              <button
-                onClick={() => onOpenMixedSelector(6, dictationMode)}
-                className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-              >
-                <div className="text-base font-bold text-stone-700">六年级</div>
-                <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
-              </button>
-            </div>
+            <button className={sectionCardClass('chengyu')} onClick={() => toggleSection('chengyu')}>
+              <div className="text-sm font-bold">成语</div>
+              <div className="text-xs opacity-60 mt-0.5">
+                {activeSection === 'chengyu' ? getChengyuLabel() : '按年级选择'}
+              </div>
+            </button>
+            <button className={sectionCardClass('zuowen')} onClick={() => toggleSection('zuowen')}>
+              <div className="text-sm font-bold">作文常错字库</div>
+              <div className="text-xs opacity-60 mt-0.5">{zuowenCount} 个词</div>
+            </button>
           </div>
 
-          {/* 作文常错字库 card */}
-          <div className="rounded-2xl border-2 border-[#B0BCDC] bg-[#F0F2FB] px-4 py-4">
-            <div className="flex items-start gap-3">
-              <span className="text-2xl leading-none">📝</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-base font-bold text-[#5868A8]">作文常错字库</div>
-                <div className="text-xs text-[#8090C0] mt-0.5">收集作文里写错的字词，随时听写复习</div>
-                <div className="text-xs text-stone-400 mt-1">
-                  {getCustomWordsForList(ZUOWEN_LIST_ID).length} 个词
-                </div>
+          {/* 展开面板：按年级选词 */}
+          {activeSection === 'grade' && (
+            <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
+              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide">选择年级</div>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => { onOpenMixedSelector(5, dictationMode); setActiveSection(null); }}
+                  className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
+                >
+                  <div className="text-sm font-bold text-stone-700">五年级</div>
+                  <div className="text-xs text-stone-400 mt-0.5">全部词语</div>
+                </button>
+                <button
+                  onClick={() => { onOpenMixedSelector(6, dictationMode); setActiveSection(null); }}
+                  className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
+                >
+                  <div className="text-sm font-bold text-stone-700">六年级</div>
+                  <div className="text-xs text-stone-400 mt-0.5">全部词语</div>
+                </button>
+                {customGradesWithWords.map(g => (
+                  <button
+                    key={g.id}
+                    onClick={() => { onStartGradeDictation(g.id, g.name, dictationMode); setActiveSection(null); }}
+                    className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
+                  >
+                    <div className="text-sm font-bold text-stone-700">{g.name}</div>
+                    <div className="text-xs text-stone-400 mt-0.5">{getGradeWordCount(g.id)} 个词</div>
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={() => onStartCustomLesson(ZUOWEN_LIST_ID, '作文常错字', dictationMode)}
-                disabled={getCustomWordsForList(ZUOWEN_LIST_ID).length === 0}
-                className="flex-1 py-2 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 disabled:cursor-not-allowed transition"
-              >
-                开始听写
-              </button>
-              <button
-                onClick={() => { getOrCreateZuowenList(); onEditLesson(ZUOWEN_LIST_ID); }}
-                className="flex-1 py-2 rounded-xl text-sm font-semibold border-2 border-[#B0BCDC] text-[#5868A8] bg-white transition"
-              >
-                编辑词库
-              </button>
-            </div>
-          </div>
+          )}
 
-          {/* Custom grade section */}
-          <div className="mt-2">
+          {/* 展开面板：成语 */}
+          {activeSection === 'chengyu' && (
+            <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
+              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide">选择年级（可多选）</div>
+              <div className="flex gap-2 flex-wrap">
+                {CHENGYU_GRADES.map(g => (
+                  <button
+                    key={g}
+                    onClick={() => toggleChengyuGrade(g)}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
+                      chengyuGrades.has(g)
+                        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                        : 'bg-white border-stone-200 text-stone-500'
+                    }`}
+                  >
+                    P{g}
+                  </button>
+                ))}
+                <button
+                  onClick={() => setChengyuGrades(new Set(CHENGYU_GRADES))}
+                  className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
+                    chengyuGrades.size === CHENGYU_GRADES.length
+                      ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                      : 'bg-white border-stone-200 text-stone-500'
+                  }`}
+                >
+                  全部
+                </button>
+              </div>
+              <div className="text-xs text-stone-400">
+                已选 {getSelectedChengyu().length} 个成语
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const selected = getSelectedChengyu();
+                    if (selected.length === 0) return;
+                    onStartChengyuDictation(chengyuToWords(selected), getChengyuLabel(), dictationMode);
+                    setActiveSection(null);
+                  }}
+                  disabled={getSelectedChengyu().length === 0}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 transition"
+                >
+                  开始听写
+                </button>
+                <button
+                  onClick={() => {
+                    const selected = getSelectedChengyu();
+                    if (selected.length === 0) return;
+                    onStartChengyuStudy(selected, getChengyuLabel());
+                    setActiveSection(null);
+                  }}
+                  disabled={getSelectedChengyu().length === 0}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-[#B0BCDC] text-[#5868A8] bg-white disabled:opacity-40 transition"
+                >
+                  开始学习
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 展开面板：作文常错字库 */}
+          {activeSection === 'zuowen' && (
+            <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
+              <div className="text-xs text-stone-400">
+                {zuowenCount === 0 ? '暂无词语，先编辑词库添加' : `共 ${zuowenCount} 个词`}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (zuowenCount === 0) return;
+                    onStartCustomLesson(ZUOWEN_LIST_ID, '作文常错字', dictationMode);
+                    setActiveSection(null);
+                  }}
+                  disabled={zuowenCount === 0}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 transition"
+                >
+                  开始听写
+                </button>
+                <button
+                  onClick={() => { getOrCreateZuowenList(); onEditLesson(ZUOWEN_LIST_ID); }}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-[#B0BCDC] text-[#5868A8] bg-white transition"
+                >
+                  编辑词库
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 自定义年级 */}
+          <div>
             <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2 px-1">自定义年级</div>
 
-            {/* Grade chips row */}
             <div className="flex flex-wrap gap-2 mb-2">
               {grades.map(g => (
                 <div key={g.id} className="flex items-center gap-1">
@@ -238,11 +389,11 @@ export default function WordListView({
               )}
             </div>
 
-            {/* Expanded grade: lesson list */}
+            {/* Expanded grade lesson management */}
             {expandedGradeId && (
               <div className="bg-white rounded-2xl border-2 border-[#E0E4F0] p-3 flex flex-col gap-2">
                 {gradeLessons.length === 0 && !showNewLessonInput && (
-                  <div className="text-sm text-stone-400 text-center py-2">暂无课程</div>
+                  <div className="text-sm text-stone-400 text-center py-2">暂无课程，先新建课</div>
                 )}
 
                 {gradeLessons.map(lesson => (
@@ -310,6 +461,36 @@ export default function WordListView({
               </div>
             )}
           </div>
+
+          {/* 重置全部进度 */}
+          <div className="mt-2 mb-4">
+            {showConfirmReset ? (
+              <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 flex flex-col gap-3">
+                <div className="text-sm text-red-700 font-medium text-center">确认重置全部听写进度？此操作不可恢复。</div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { onResetAll(); setShowConfirmReset(false); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white transition"
+                  >
+                    确认重置
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmReset(false)}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-stone-200 text-stone-600 bg-white transition"
+                  >
+                    取消
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowConfirmReset(true)}
+                className="w-full py-3 rounded-2xl text-sm font-semibold border-2 border-stone-200 text-stone-400 bg-white transition hover:border-red-200 hover:text-red-400"
+              >
+                重置全部进度
+              </button>
+            )}
+          </div>
         </>
       )}
 
@@ -317,10 +498,10 @@ export default function WordListView({
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={onOpenStudyLessonSelector}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
+            className="col-span-2 rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
           >
             <div className="text-base font-bold text-[#5868A8]">按课学习</div>
-            <div className="text-xs text-[#8090C0] mt-0.5">选年级→选课</div>
+            <div className="text-xs text-[#8090C0] mt-0.5">选年级 → 选课</div>
           </button>
           <button
             onClick={() => onOpenStudyGrade(5)}
@@ -343,15 +524,13 @@ export default function WordListView({
             <div className="text-base font-bold text-stone-700">全部</div>
             <div className="text-xs text-stone-400 mt-0.5">五六年级一起</div>
           </button>
-        </div>
-      )}
-
-      {mainTab === 'chengyu' && (
-        <div className="flex-1 min-h-0 -mx-4">
-          <ChengYuPanel
-            onStartDictation={onStartChengyuDictation}
-            onStartStudy={onStartChengyuStudy}
-          />
+          <button
+            onClick={() => onStartChengyuStudy(chengyuList, '全部')}
+            className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+          >
+            <div className="text-base font-bold text-stone-700">成语</div>
+            <div className="text-xs text-stone-400 mt-0.5">全部成语学习</div>
+          </button>
         </div>
       )}
     </div>
