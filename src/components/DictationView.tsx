@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { WordList, DictationMode, FilterMode, Subject, SessionConfig, Word } from '../types';
-import { getWordStats, clearAllRecords, clearWordsRecords } from '../utils/storage';
+import { getWordStats, clearAllRecords, clearWordsRecords, saveAttempt } from '../utils/storage';
 import WordCard from './WordCard';
 
 interface DictationViewProps {
@@ -25,9 +25,7 @@ export default function DictationView({
   const ONE_MONTH_MS = 30 * 24 * 60 * 60 * 1000;
   const [confirmClear, setConfirmClear] = useState(false);
   const [cleared, setCleared] = useState(false);
-  const [sessionCorrect, setSessionCorrect] = useState(0);
-  const [sessionTotal, setSessionTotal] = useState(0);
-  const [sessionWrongWords, setSessionWrongWords] = useState<Word[]>([]);
+  const [sessionMarks, setSessionMarks] = useState<Map<string, boolean>>(new Map());
   const [showCompletion, setShowCompletion] = useState(false);
 
   function handleClearAll() {
@@ -38,18 +36,23 @@ export default function DictationView({
     }
     setCleared(c => !c);
     setConfirmClear(false);
+    setSessionMarks(new Map());
   }
 
-  const handleSessionAttempt = useCallback((word: Word, correct: boolean) => {
-    setSessionTotal(t => t + 1);
-    if (correct) {
-      setSessionCorrect(c => c + 1);
-    } else {
-      setSessionWrongWords(prev =>
-        prev.find(w => w.id === word.id) ? prev : [...prev, word],
-      );
-    }
+  const handleMark = useCallback((word: Word, correct: boolean) => {
+    setSessionMarks(prev => {
+      const next = new Map(prev);
+      next.set(word.id, correct);
+      return next;
+    });
   }, []);
+
+  function handleComplete() {
+    sessionMarks.forEach((correct, wordId) => {
+      saveAttempt(wordId, correct);
+    });
+    setShowCompletion(true);
+  }
 
   const clearLabel = sessionConfig ? '重置本次进度' : '清除全部记录';
 
@@ -113,6 +116,10 @@ export default function DictationView({
     ? `按错误率排序 · ${filteredWords.length} 个词`
     : `近1个月未练习 · ${filteredWords.length} 个词`;
 
+  const sessionTotal = sessionMarks.size;
+  const sessionCorrect = [...sessionMarks.values()].filter(Boolean).length;
+  const sessionWrongWords = filteredWords.filter(w => sessionMarks.get(w.id) === false);
+
   return (
     <div className="flex flex-col h-full">
     <div className="flex-1 overflow-y-auto p-4 pb-4">
@@ -162,7 +169,9 @@ export default function DictationView({
             index={index}
             dictationMode={dictationMode}
             subject={subject}
-            onAttempt={handleSessionAttempt}
+            pendingResult={sessionMarks.get(word.id) ?? null}
+            locked={showCompletion}
+            onMark={handleMark}
           />
         ))}
       </div>
@@ -171,7 +180,7 @@ export default function DictationView({
     {onComplete && (
       <div className="bg-white border-t border-stone-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-4">
         <button
-          onClick={() => setShowCompletion(true)}
+          onClick={handleComplete}
           className="w-full py-3 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition bg-gradient-to-r from-[#7888C8] to-[#A8B8DC]"
         >
           完成听写 ✓
