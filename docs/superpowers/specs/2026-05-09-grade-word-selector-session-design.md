@@ -60,7 +60,7 @@ Three rule buttons, mutually exclusive:
 - `最久未练` — top N words by longest time since last practice
 - `近期错误率高` — top N words by error rate in the last 10 attempts
 
-Tapping a rule button immediately checks the top N words (where N = current slider value) and deselects the rest. The user can then manually tap checkboxes to adjust. Tapping the active rule again deselects all (toggle off).
+Tapping a rule button immediately checks the top N words (where N = current slider value) and deselects the rest. The user can then manually tap checkboxes to adjust. Switching to a different rule re-runs auto-select from scratch (manual adjustments are discarded). Tapping the active rule again deselects all and clears the active rule (toggle off).
 
 A counter shows: `已选 X 个`
 

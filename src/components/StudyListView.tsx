@@ -1,5 +1,6 @@
 import { Word } from '../types';
 import { Volume2, BookOpen } from 'lucide-react';
+import { getDisplayPinyin } from '../utils/pinyin';
 
 interface StudyListViewProps {
   words: Word[];
@@ -58,11 +59,9 @@ export default function StudyListView({ words }: StudyListViewProps) {
                         </span>
                       )}
                     </div>
-                    {word.pinyin && (
-                      <div className="text-sm text-stone-400 mt-0.5 font-medium">
-                        {word.pinyin}
-                      </div>
-                    )}
+                    <div className="text-sm text-stone-400 mt-0.5 font-medium">
+                      {getDisplayPinyin(word.text, word.pinyin)}
+                    </div>
                     {word.meaning && (
                       <div className="text-xs text-stone-500 mt-1">{word.meaning}</div>
                     )}

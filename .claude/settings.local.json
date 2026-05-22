@@ -6,7 +6,17 @@
       "Bash(docker --version)",
       "Bash(/usr/local/bin/docker run:*)",
       "Bash(/usr/local/bin/node --version)",
-      "Bash(/opt/homebrew/bin/node --version)"
+      "Bash(/opt/homebrew/bin/node --version)",
+      "Bash(git -C /Users/guotiantian/Documents/dictation_star rev-parse HEAD)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e ' *)",
+      "Bash(git commit *)",
+      "Bash(git -C /Users/guotiantian/Documents/dictation_star ls-files --stage src/components/WordListView.tsx)",
+      "Bash(npm test *)",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)"
     ]
   }
 }

@@ -1,0 +1,3 @@
+1. when press right button, will play an exiting sound. when press wrong button, will play a losing sound.
+2. when complete one round of dictation, need to pop up the rate of correctness and rate of failure this time.
+主页有两个模式，听写模式和学习模式，听写模式下是家长听写模式和学生听写模式，学习模式是直接显示词语和例句

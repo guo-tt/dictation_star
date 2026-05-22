@@ -13,6 +13,7 @@ import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWor
 import LessonEditView from './components/LessonEditView';
 import { presetWordLists } from './data/wordLists';
 import ChengYuStudyView from './components/ChengYuStudyView';
+import ChengYuSelectorView from './components/ChengYuSelectorView';
 import type { ChengYu } from './data/chengyu';
 
 ensureFreshInstall();
@@ -43,6 +44,7 @@ export default function App() {
   const [dictationKey, setDictationKey] = useState(0);
   const [chengyuStudyList, setChengyuStudyList] = useState<ChengYu[]>([]);
   const [chengyuStudyLabel, setChengyuStudyLabel] = useState('全部');
+  const [chengyuSelectorMode, setChengyuSelectorMode] = useState<DictationMode>('parent');
 
   const [editingListId, setEditingListId] = useState<string | null>(null);
 
@@ -144,6 +146,20 @@ export default function App() {
     setView('chengyuStudy');
   }
 
+  function openChengyuSelector(mode: DictationMode) {
+    setChengyuSelectorMode(mode);
+    setView('chengyuSelector');
+  }
+
+  function startGradeStudy(gradeId: string, gradeName: string) {
+    const lists = getCustomListsForGrade(gradeId);
+    const words = lists.flatMap(l => getCustomWordsForList(l.id));
+    setStudyWords(words);
+    setStudyTitle(gradeName);
+    setStudyOrigin('wordlists');
+    setView('studyList');
+  }
+
   function handleLessonSelected(lessonId: string) {
     if (lessonSelectorMode === 'study') {
       const list = presetWordLists.find(l => l.id === lessonId);
@@ -180,6 +196,7 @@ export default function App() {
   }
 
   function handleBack() {
+    if (view === 'chengyuSelector') { setView('wordlists'); return; }
     if (view === 'chengyuStudy') { setView('wordlists'); return; }
     if (view === 'lessonEdit') {
       setView('wordlists');
@@ -203,13 +220,14 @@ export default function App() {
     : view === 'studyList' ? `学习：${studyTitle}`
     : view === 'study' ? `学习：${selectedList?.name ?? ''}`
     : view === 'chengyuStudy' ? `学习成语 · ${chengyuStudyLabel}`
+    : view === 'chengyuSelector' ? '选择成语'
     : sessionConfig ? `听写 · ${sessionConfig.grade}`
     : selectedList?.name ?? '听写';
 
   const headerBack =
     view === 'dictation' || view === 'study' || view === 'wordSelector' ||
     view === 'lessonSelector' || view === 'studyList' || view === 'lessonEdit' ||
-    view === 'chengyuStudy'
+    view === 'chengyuStudy' || view === 'chengyuSelector'
       ? handleBack
       : undefined;
 
@@ -231,8 +249,9 @@ export default function App() {
             onEditLesson={openLessonEdit}
             onStartCustomLesson={openCustomLessonDictation}
             onStartGradeDictation={openGradeDictation}
-            onStartChengyuDictation={startChengyuDictation}
+            onOpenChengyuSelector={openChengyuSelector}
             onStartChengyuStudy={startChengyuStudy}
+            onStartGradeStudy={startGradeStudy}
             onResetAll={clearAllRecords}
           />
         )}
@@ -280,6 +299,12 @@ export default function App() {
         )}
         {view === 'chengyuStudy' && (
           <ChengYuStudyView list={chengyuStudyList} />
+        )}
+        {view === 'chengyuSelector' && (
+          <ChengYuSelectorView
+            mode={chengyuSelectorMode}
+            onStart={words => startChengyuDictation(words, '成语', chengyuSelectorMode)}
+          />
         )}
       </main>
 

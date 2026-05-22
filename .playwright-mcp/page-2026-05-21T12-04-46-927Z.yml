@@ -1,0 +1,37 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - img [ref=e5]
+    - heading "听写小状元" [level=1] [ref=e7]
+    - button "搜索" [ref=e8] [cursor=pointer]:
+      - img [ref=e9]
+  - main [ref=e12]:
+    - generic [ref=e13]:
+      - generic [ref=e14]:
+        - button "听写" [ref=e15] [cursor=pointer]
+        - button "学习" [ref=e16] [cursor=pointer]
+      - generic [ref=e17]:
+        - button "👨‍👩‍👧 家长模式 显示文字" [ref=e18] [cursor=pointer]:
+          - generic [ref=e19]: 👨‍👩‍👧 家长模式
+          - generic [ref=e20]: 显示文字
+        - button "✏️ 学生模式 隐藏文字" [ref=e21] [cursor=pointer]:
+          - generic [ref=e22]: ✏️ 学生模式
+          - generic [ref=e23]: 隐藏文字
+      - generic [ref=e24]:
+        - button "按课听写 选年级→选课" [ref=e25] [cursor=pointer]:
+          - generic [ref=e26]: 按课听写
+          - generic [ref=e27]: 选年级→选课
+        - button "五年级 全部五年级词语" [ref=e28] [cursor=pointer]:
+          - generic [ref=e29]: 五年级
+          - generic [ref=e30]: 全部五年级词语
+        - button "六年级 全部六年级词语" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: 六年级
+          - generic [ref=e33]: 全部六年级词语
+        - button "全部 五六年级一起" [ref=e34] [cursor=pointer]:
+          - generic [ref=e35]: 全部
+          - generic [ref=e36]: 五六年级一起
+      - generic [ref=e37]:
+        - generic [ref=e38]: 自定义年级
+        - button "新建年级" [ref=e40] [cursor=pointer]:
+          - img [ref=e41]
+          - text: 新建年级
+  - button "🔄 重置全部进度" [ref=e43] [cursor=pointer]

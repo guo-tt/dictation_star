@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, ChevronDown, ChevronRight, Pencil, Trash2, BookOpen } from 'lucide-react';
-import { DictationMode, GradeFilter, CustomGrade, CustomListMeta, Word } from '../types';
+import { DictationMode, GradeFilter, CustomGrade, CustomListMeta } from '../types';
 import type { ChengYu } from '../data/chengyu';
-import { chengyuList, chengyuToWords } from '../data/chengyu';
+import { chengyuList } from '../data/chengyu';
 import {
   getCustomGrades, addCustomGrade, deleteCustomGrade,
   addCustomList, getCustomListsForGrade, deleteCustomList,
@@ -17,14 +17,13 @@ interface WordListViewProps {
   onEditLesson: (listId: string) => void;
   onStartCustomLesson: (listId: string, lessonName: string, mode: DictationMode) => void;
   onStartGradeDictation: (gradeId: string, gradeName: string, mode: DictationMode) => void;
-  onStartChengyuDictation: (words: Word[], label: string, mode: DictationMode) => void;
+  onOpenChengyuSelector: (mode: DictationMode) => void;
   onStartChengyuStudy: (list: ChengYu[], label: string) => void;
+  onStartGradeStudy: (gradeId: string, gradeName: string) => void;
   onResetAll: () => void;
 }
 
-type ActiveSection = 'grade' | 'chengyu' | 'zuowen' | null;
-type ChengyuGrade = 3 | 4 | 5 | 6;
-const CHENGYU_GRADES: ChengyuGrade[] = [3, 4, 5, 6];
+type ActivePanel = 'grade' | 'lesson' | 'zuowen' | null;
 
 function getGradeWordCount(gradeId: string): number {
   return getCustomListsForGrade(gradeId).reduce(
@@ -32,6 +31,8 @@ function getGradeWordCount(gradeId: string): number {
     0,
   );
 }
+
+const cardClass = 'rounded-2xl px-4 py-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition w-full';
 
 export default function WordListView({
   onOpenMixedSelector,
@@ -41,20 +42,16 @@ export default function WordListView({
   onEditLesson,
   onStartCustomLesson,
   onStartGradeDictation,
-  onStartChengyuDictation,
+  onOpenChengyuSelector,
   onStartChengyuStudy,
+  onStartGradeStudy,
   onResetAll,
 }: WordListViewProps) {
   const [mainTab, setMainTab] = useState<'dictation' | 'study'>('dictation');
   const [dictationMode, setDictationMode] = useState<DictationMode>('parent');
-  const [activeSection, setActiveSection] = useState<ActiveSection>(null);
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null);
+  const [lessonCustomGradeId, setLessonCustomGradeId] = useState<string | null>(null);
 
-  // Chengyu grade multi-select (all selected by default)
-  const [chengyuGrades, setChengyuGrades] = useState<Set<ChengyuGrade>>(
-    () => new Set(CHENGYU_GRADES),
-  );
-
-  // Custom grades state
   const [grades, setGrades] = useState<CustomGrade[]>(() => getCustomGrades());
   const [expandedGradeId, setExpandedGradeId] = useState<string | null>(null);
   const [gradeLessons, setGradeLessons] = useState<CustomListMeta[]>([]);
@@ -70,33 +67,9 @@ export default function WordListView({
     }
   }, [expandedGradeId]);
 
-  function toggleSection(section: ActiveSection) {
-    setActiveSection(prev => (prev === section ? null : section));
-  }
-
-  function toggleChengyuGrade(g: ChengyuGrade) {
-    setChengyuGrades(prev => {
-      const next = new Set(prev);
-      if (next.has(g)) {
-        if (next.size === 1) return prev; // keep at least one
-        next.delete(g);
-      } else {
-        next.add(g);
-      }
-      return next;
-    });
-  }
-
-  function getSelectedChengyu(): ChengYu[] {
-    if (chengyuGrades.size === CHENGYU_GRADES.length) return chengyuList;
-    return chengyuList.filter(cy =>
-      cy.examples.some(e => chengyuGrades.has(e.grade as ChengyuGrade)),
-    );
-  }
-
-  function getChengyuLabel(): string {
-    if (chengyuGrades.size === CHENGYU_GRADES.length) return '全部';
-    return [...chengyuGrades].sort().map(g => `P${g}`).join('+');
+  function togglePanel(p: ActivePanel) {
+    setActivePanel(prev => (prev === p ? null : p));
+    if (p !== 'lesson') setLessonCustomGradeId(null);
   }
 
   function handleAddGrade() {
@@ -130,14 +103,19 @@ export default function WordListView({
   }
 
   const zuowenCount = getCustomWordsForList(ZUOWEN_LIST_ID).length;
-  const customGradesWithWords = grades.filter(g => getGradeWordCount(g.id) > 0);
 
-  const sectionCardClass = (section: ActiveSection) =>
+  const panelCardStyle = (p: ActivePanel) =>
     `flex-1 rounded-2xl px-3 py-4 text-left border-2 transition active:scale-[0.98] ${
-      activeSection === section
-        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-        : 'bg-white border-stone-200 text-stone-700'
+      activePanel === p
+        ? 'bg-[#F0F2FB] border-[#B0BCDC]'
+        : 'bg-white border-stone-200'
     }`;
+
+  const panelTitleStyle = (p: ActivePanel) =>
+    `text-sm font-bold ${activePanel === p ? 'text-[#5868A8]' : 'text-stone-700'}`;
+
+  const panelSubStyle = (p: ActivePanel) =>
+    `text-xs mt-0.5 ${activePanel === p ? 'text-[#8090C0]' : 'text-stone-400'}`;
 
   return (
     <div className="flex flex-col h-full px-4 py-5 gap-4 overflow-y-auto">
@@ -162,6 +140,7 @@ export default function WordListView({
         ))}
       </div>
 
+      {/* ── 听写 tab ── */}
       {mainTab === 'dictation' && (
         <>
           {/* Mode toggle */}
@@ -185,141 +164,141 @@ export default function WordListView({
             ))}
           </div>
 
-          {/* 按课听写 */}
-          <button
-            onClick={() => onOpenLessonSelector(dictationMode)}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
-          >
-            <div className="text-base font-bold text-[#5868A8]">按课听写</div>
-            <div className="text-xs text-[#8090C0] mt-0.5">选年级 → 选课</div>
-          </button>
-
-          {/* 三栏入口 */}
-          <div className="flex gap-2">
-            <button className={sectionCardClass('grade')} onClick={() => toggleSection('grade')}>
-              <div className="text-sm font-bold">按年级选词</div>
-              <div className="text-xs opacity-60 mt-0.5">五六年级及自定义</div>
+          {/* Row 3: 按年级听写 | 按课听写 */}
+          <div className="flex gap-3">
+            <button className={panelCardStyle('grade')} onClick={() => togglePanel('grade')}>
+              <div className={panelTitleStyle('grade')}>按年级听写</div>
+              <div className={panelSubStyle('grade')}>选年级→开始</div>
             </button>
-            <button className={sectionCardClass('chengyu')} onClick={() => toggleSection('chengyu')}>
-              <div className="text-sm font-bold">成语</div>
-              <div className="text-xs opacity-60 mt-0.5">
-                {activeSection === 'chengyu' ? getChengyuLabel() : '按年级选择'}
-              </div>
-            </button>
-            <button className={sectionCardClass('zuowen')} onClick={() => toggleSection('zuowen')}>
-              <div className="text-sm font-bold">作文常错字库</div>
-              <div className="text-xs opacity-60 mt-0.5">{zuowenCount} 个词</div>
+            <button className={panelCardStyle('lesson')} onClick={() => togglePanel('lesson')}>
+              <div className={panelTitleStyle('lesson')}>按课听写</div>
+              <div className={panelSubStyle('lesson')}>选年级→选课</div>
             </button>
           </div>
 
-          {/* 展开面板：按年级选词 */}
-          {activeSection === 'grade' && (
+          {/* Panel: 按年级听写 */}
+          {activePanel === 'grade' && (
             <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
-              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide">选择年级</div>
               <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => { onOpenMixedSelector(5, dictationMode); setActiveSection(null); }}
-                  className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
-                >
-                  <div className="text-sm font-bold text-stone-700">五年级</div>
-                  <div className="text-xs text-stone-400 mt-0.5">全部词语</div>
-                </button>
-                <button
-                  onClick={() => { onOpenMixedSelector(6, dictationMode); setActiveSection(null); }}
-                  className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
-                >
-                  <div className="text-sm font-bold text-stone-700">六年级</div>
-                  <div className="text-xs text-stone-400 mt-0.5">全部词语</div>
-                </button>
-                {customGradesWithWords.map(g => (
-                  <button
-                    key={g.id}
-                    onClick={() => { onStartGradeDictation(g.id, g.name, dictationMode); setActiveSection(null); }}
-                    className="rounded-xl px-4 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition"
-                  >
-                    <div className="text-sm font-bold text-stone-700">{g.name}</div>
-                    <div className="text-xs text-stone-400 mt-0.5">{getGradeWordCount(g.id)} 个词</div>
+                {([
+                  { label: '五年级', sub: '全部五年级词语', action: () => { onOpenMixedSelector(5, dictationMode); setActivePanel(null); } },
+                  { label: '六年级', sub: '全部六年级词语', action: () => { onOpenMixedSelector(6, dictationMode); setActivePanel(null); } },
+                ]).map(item => (
+                  <button key={item.label} onClick={item.action} className="rounded-xl px-3 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition">
+                    <div className="text-sm font-bold text-stone-700">{item.label}</div>
+                    <div className="text-xs text-stone-400 mt-0.5">{item.sub}</div>
                   </button>
                 ))}
+                {grades.map(g => {
+                  const count = getGradeWordCount(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      disabled={count === 0}
+                      onClick={() => { onStartGradeDictation(g.id, g.name, dictationMode); setActivePanel(null); }}
+                      className="rounded-xl px-3 py-3 text-left border-2 border-stone-200 bg-stone-50 active:bg-[#F0F2FB] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <div className="text-sm font-bold text-stone-700">{g.name}</div>
+                      <div className="text-xs text-stone-400 mt-0.5">{count === 0 ? '暂无词语' : `${count} 个词`}</div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
 
-          {/* 展开面板：成语 */}
-          {activeSection === 'chengyu' && (
+          {/* Panel: 按课听写 */}
+          {activePanel === 'lesson' && (
             <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
-              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide">选择年级（可多选）</div>
-              <div className="flex gap-2 flex-wrap">
-                {CHENGYU_GRADES.map(g => (
-                  <button
-                    key={g}
-                    onClick={() => toggleChengyuGrade(g)}
-                    className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
-                      chengyuGrades.has(g)
-                        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                        : 'bg-white border-stone-200 text-stone-500'
-                    }`}
-                  >
-                    P{g}
-                  </button>
-                ))}
-                <button
-                  onClick={() => setChengyuGrades(new Set(CHENGYU_GRADES))}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold border-2 transition ${
-                    chengyuGrades.size === CHENGYU_GRADES.length
-                      ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                      : 'bg-white border-stone-200 text-stone-500'
-                  }`}
-                >
-                  全部
-                </button>
-              </div>
-              <div className="text-xs text-stone-400">
-                已选 {getSelectedChengyu().length} 个成语
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const selected = getSelectedChengyu();
-                    if (selected.length === 0) return;
-                    onStartChengyuDictation(chengyuToWords(selected), getChengyuLabel(), dictationMode);
-                    setActiveSection(null);
-                  }}
-                  disabled={getSelectedChengyu().length === 0}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 transition"
-                >
-                  开始听写
-                </button>
-                <button
-                  onClick={() => {
-                    const selected = getSelectedChengyu();
-                    if (selected.length === 0) return;
-                    onStartChengyuStudy(selected, getChengyuLabel());
-                    setActiveSection(null);
-                  }}
-                  disabled={getSelectedChengyu().length === 0}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-[#B0BCDC] text-[#5868A8] bg-white disabled:opacity-40 transition"
-                >
-                  开始学习
-                </button>
-              </div>
+              {/* Preset grades → navigate to LessonSelectorView */}
+              <button
+                onClick={() => { onOpenLessonSelector(dictationMode); setActivePanel(null); }}
+                className="w-full rounded-xl px-4 py-3 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
+              >
+                <div className="text-sm font-bold text-[#5868A8]">五年级 / 六年级</div>
+                <div className="text-xs text-[#8090C0] mt-0.5">选年级→选课→开始听写</div>
+              </button>
+
+              {/* Custom grades */}
+              {grades.length > 0 && (
+                <>
+                  <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide">自定义年级</div>
+                  {grades.map(g => {
+                    const lessons = getCustomListsForGrade(g.id);
+                    const expanded = lessonCustomGradeId === g.id;
+                    return (
+                      <div key={g.id}>
+                        <button
+                          onClick={() => setLessonCustomGradeId(expanded ? null : g.id)}
+                          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition ${
+                            expanded
+                              ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                              : 'bg-stone-50 border-stone-200 text-stone-700'
+                          }`}
+                        >
+                          <span>{g.name}</span>
+                          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                        </button>
+                        {expanded && (
+                          <div className="mt-1.5 ml-2 flex flex-col gap-1.5">
+                            {lessons.length === 0 && (
+                              <div className="text-xs text-stone-400 py-1 px-2">暂无课程，请在下方自定义年级里添加</div>
+                            )}
+                            {lessons.map(lesson => (
+                              <button
+                                key={lesson.id}
+                                onClick={() => { onStartCustomLesson(lesson.id, lesson.name, dictationMode); setActivePanel(null); }}
+                                className="text-left px-3 py-2 rounded-xl bg-stone-50 border border-stone-200 text-sm text-stone-700 hover:bg-[#F0F2FB] transition"
+                              >
+                                {lesson.name}
+                              </button>
+                            ))}
+                            {lessons.length > 1 && (
+                              <button
+                                onClick={() => { onStartGradeDictation(g.id, g.name, dictationMode); setActivePanel(null); }}
+                                className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[#F0F2FB] border-2 border-[#B0BCDC] text-[#5868A8] text-xs font-semibold"
+                              >
+                                <BookOpen size={12} /> 整年级听写
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
             </div>
           )}
 
-          {/* 展开面板：作文常错字库 */}
-          {activeSection === 'zuowen' && (
+          {/* Row 4: 成语 | 作文常错字库 */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => onOpenChengyuSelector(dictationMode)}
+              className="flex-1 rounded-2xl px-3 py-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+            >
+              <div className="text-sm font-bold text-stone-700">成语</div>
+              <div className="text-xs text-stone-400 mt-0.5">按年级选词听写</div>
+            </button>
+            <button
+              className={`flex-1 ${panelCardStyle('zuowen')}`}
+              onClick={() => togglePanel('zuowen')}
+            >
+              <div className={panelTitleStyle('zuowen')}>作文常错字库</div>
+              <div className={panelSubStyle('zuowen')}>{zuowenCount} 个词</div>
+            </button>
+          </div>
+
+          {/* Panel: 作文常错字库 */}
+          {activePanel === 'zuowen' && (
             <div className="rounded-2xl border-2 border-[#E0E4F0] bg-white p-4 flex flex-col gap-3">
               <div className="text-xs text-stone-400">
                 {zuowenCount === 0 ? '暂无词语，先编辑词库添加' : `共 ${zuowenCount} 个词`}
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    if (zuowenCount === 0) return;
-                    onStartCustomLesson(ZUOWEN_LIST_ID, '作文常错字', dictationMode);
-                    setActiveSection(null);
-                  }}
                   disabled={zuowenCount === 0}
+                  onClick={() => { onStartCustomLesson(ZUOWEN_LIST_ID, '作文常错字', dictationMode); setActivePanel(null); }}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-[#8090C0] text-white disabled:opacity-40 transition"
                 >
                   开始听写
@@ -334,10 +313,9 @@ export default function WordListView({
             </div>
           )}
 
-          {/* 自定义年级 */}
+          {/* Row 5: 自定义年级 */}
           <div>
             <div className="text-xs font-semibold text-stone-400 uppercase tracking-wide mb-2 px-1">自定义年级</div>
-
             <div className="flex flex-wrap gap-2 mb-2">
               {grades.map(g => (
                 <div key={g.id} className="flex items-center gap-1">
@@ -352,11 +330,7 @@ export default function WordListView({
                     {g.name}
                     {expandedGradeId === g.id ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   </button>
-                  <button
-                    onClick={() => handleDeleteGrade(g.id)}
-                    className="p-1 text-stone-300 hover:text-red-400 transition"
-                    aria-label="删除年级"
-                  >
+                  <button onClick={() => handleDeleteGrade(g.id)} className="p-1 text-stone-300 hover:text-red-400 transition" aria-label="删除年级">
                     <Trash2 size={13} />
                   </button>
                 </div>
@@ -395,7 +369,6 @@ export default function WordListView({
                 {gradeLessons.length === 0 && !showNewLessonInput && (
                   <div className="text-sm text-stone-400 text-center py-2">暂无课程，先新建课</div>
                 )}
-
                 {gradeLessons.map(lesson => (
                   <div key={lesson.id} className="flex items-center gap-2">
                     <button
@@ -404,23 +377,14 @@ export default function WordListView({
                     >
                       {lesson.name}
                     </button>
-                    <button
-                      onClick={() => onEditLesson(lesson.id)}
-                      className="p-2 rounded-xl border border-stone-200 text-stone-400 hover:text-[#8090C0] transition"
-                      aria-label="编辑课"
-                    >
+                    <button onClick={() => onEditLesson(lesson.id)} className="p-2 rounded-xl border border-stone-200 text-stone-400 hover:text-[#8090C0] transition" aria-label="编辑课">
                       <Pencil size={14} />
                     </button>
-                    <button
-                      onClick={() => handleDeleteLesson(lesson.id)}
-                      className="p-2 rounded-xl border border-stone-200 text-stone-400 hover:text-red-400 transition"
-                      aria-label="删除课"
-                    >
+                    <button onClick={() => handleDeleteLesson(lesson.id)} className="p-2 rounded-xl border border-stone-200 text-stone-400 hover:text-red-400 transition" aria-label="删除课">
                       <Trash2 size={14} />
                     </button>
                   </div>
                 ))}
-
                 {showNewLessonInput ? (
                   <div className="flex items-center gap-1">
                     <input
@@ -446,7 +410,6 @@ export default function WordListView({
                     <Plus size={14} /> 新建课
                   </button>
                 )}
-
                 {gradeLessons.length > 0 && (
                   <button
                     onClick={() => {
@@ -466,18 +429,12 @@ export default function WordListView({
           <div className="mt-2 mb-4">
             {showConfirmReset ? (
               <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4 flex flex-col gap-3">
-                <div className="text-sm text-red-700 font-medium text-center">确认重置全部听写进度？此操作不可恢复。</div>
+                <div className="text-sm text-red-700 font-medium text-center">确认重置全部听写进度？词语数据不变，只清零分数记录。</div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => { onResetAll(); setShowConfirmReset(false); }}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white transition"
-                  >
+                  <button onClick={() => { onResetAll(); setShowConfirmReset(false); }} className="flex-1 py-2.5 rounded-xl text-sm font-bold bg-red-500 text-white transition">
                     确认重置
                   </button>
-                  <button
-                    onClick={() => setShowConfirmReset(false)}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-stone-200 text-stone-600 bg-white transition"
-                  >
+                  <button onClick={() => setShowConfirmReset(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold border-2 border-stone-200 text-stone-600 bg-white transition">
                     取消
                   </button>
                 </div>
@@ -494,43 +451,37 @@ export default function WordListView({
         </>
       )}
 
+      {/* ── 学习 tab ── */}
       {mainTab === 'study' && (
         <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={onOpenStudyLessonSelector}
-            className="col-span-2 rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition"
-          >
+          <button onClick={onOpenStudyLessonSelector} className="col-span-2 rounded-2xl px-4 py-5 text-left border-2 border-[#B0BCDC] bg-[#F0F2FB] active:scale-[0.98] transition">
             <div className="text-base font-bold text-[#5868A8]">按课学习</div>
             <div className="text-xs text-[#8090C0] mt-0.5">选年级 → 选课</div>
           </button>
-          <button
-            onClick={() => onOpenStudyGrade(5)}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-          >
+          <button onClick={() => onOpenStudyGrade(5)} className={cardClass}>
             <div className="text-base font-bold text-stone-700">五年级</div>
             <div className="text-xs text-stone-400 mt-0.5">全部五年级词语</div>
           </button>
-          <button
-            onClick={() => onOpenStudyGrade(6)}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-          >
+          <button onClick={() => onOpenStudyGrade(6)} className={cardClass}>
             <div className="text-base font-bold text-stone-700">六年级</div>
             <div className="text-xs text-stone-400 mt-0.5">全部六年级词语</div>
           </button>
-          <button
-            onClick={() => onOpenStudyGrade('all')}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-          >
+          <button onClick={() => onOpenStudyGrade('all')} className={cardClass}>
             <div className="text-base font-bold text-stone-700">全部</div>
             <div className="text-xs text-stone-400 mt-0.5">五六年级一起</div>
           </button>
-          <button
-            onClick={() => onStartChengyuStudy(chengyuList, '全部')}
-            className="rounded-2xl px-4 py-5 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
-          >
+          <button onClick={() => onStartChengyuStudy(chengyuList, '全部')} className={cardClass}>
             <div className="text-base font-bold text-stone-700">成语</div>
             <div className="text-xs text-stone-400 mt-0.5">全部成语学习</div>
           </button>
+          {grades.map(g => (
+            <button key={g.id} onClick={() => onStartGradeStudy(g.id, g.name)} className={cardClass}>
+              <div className="text-base font-bold text-stone-700">{g.name}</div>
+              <div className="text-xs text-stone-400 mt-0.5">
+                {getGradeWordCount(g.id) === 0 ? '暂无词语' : `${getGradeWordCount(g.id)} 个词`}
+              </div>
+            </button>
+          ))}
         </div>
       )}
     </div>
