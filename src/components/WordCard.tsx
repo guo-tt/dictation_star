@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { Volume2, BookOpen, Eye, EyeOff, Pencil, Trash2 } from 'lucide-react';
 import { Word, DictationMode, Subject } from '../types';
-import { saveAttempt, getWordStats, deleteCustomWord, clearWordRecord } from '../utils/storage';
+import { getWordStats, deleteCustomWord, clearWordRecord } from '../utils/storage';
 import { playSound } from '../utils/sound';
 import { getDisplayPinyin } from '../utils/pinyin';
 import EditWordModal from './EditWordModal';
@@ -11,7 +11,9 @@ interface WordCardProps {
   index: number;
   dictationMode: DictationMode;
   subject: Subject;
-  onAttempt?: (word: Word, correct: boolean) => void;
+  onMark?: (word: Word, correct: boolean) => void;
+  pendingResult: boolean | null;
+  locked?: boolean;
 }
 
 function speak(text: string, lang: string, rate = 0.8) {
@@ -42,7 +44,7 @@ function formatInterval(ms: number): string {
   return `${days}天`;
 }
 
-export default function WordCard({ word, index, dictationMode, subject, onAttempt }: WordCardProps) {
+export default function WordCard({ word, index, dictationMode, subject, onMark, pendingResult, locked }: WordCardProps) {
   const isChinese = subject === 'chinese';
   const lang = isChinese ? 'zh-CN' : 'en-US';
 
@@ -54,12 +56,12 @@ export default function WordCard({ word, index, dictationMode, subject, onAttemp
   const [statsVersion, setStatsVersion] = useState(0);
   const stats = useMemo(() => getWordStats(localWord.id), [localWord.id, statsVersion]);
 
-  const handleAttempt = useCallback((correct: boolean) => {
+  const handleMark = useCallback((correct: boolean) => {
+    if (locked) return;
+    if (pendingResult === correct) return;
     playSound(correct ? 'correct' : 'wrong');
-    saveAttempt(word.id, correct);
-    setStatsVersion(v => v + 1);
-    onAttempt?.(localWord, correct);
-  }, [word.id, onAttempt, localWord]);
+    onMark?.(localWord, correct);
+  }, [locked, pendingResult, localWord, onMark]);
 
   function playWord() { speak(localWord.text, lang); }
   function playExample() {
@@ -273,14 +275,24 @@ export default function WordCard({ word, index, dictationMode, subject, onAttemp
         ) : (
           <div className="flex gap-2">
             <button
-              onClick={() => handleAttempt(true)}
-              className="flex-1 py-2.5 rounded-xl bg-[#90BE88] hover:bg-[#78A870] active:bg-[#608858] text-white font-bold text-xl transition-colors shadow-sm"
+              onClick={() => handleMark(true)}
+              disabled={locked}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                pendingResult === true
+                  ? 'bg-[#4A8842] text-white'
+                  : 'bg-white border-2 border-[#90BE88] text-[#4A8842]'
+              }`}
             >
               ✓
             </button>
             <button
-              onClick={() => handleAttempt(false)}
-              className="flex-1 py-2.5 rounded-xl bg-[#D09098] hover:bg-[#B87880] active:bg-[#A06870] text-white font-bold text-xl transition-colors shadow-sm"
+              onClick={() => handleMark(false)}
+              disabled={locked}
+              className={`flex-1 py-2.5 rounded-xl font-bold text-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
+                pendingResult === false
+                  ? 'bg-[#B05860] text-white'
+                  : 'bg-white border-2 border-[#D09098] text-[#B05860]'
+              }`}
             >
               ✗
             </button>
