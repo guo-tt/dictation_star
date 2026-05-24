@@ -1,4 +1,5 @@
 import type { Word } from '../types';
+import { getCustomExample } from '../utils/storage';
 
 export interface ChengYuExample {
   grade: 3 | 4 | 5 | 6;
@@ -17,7 +18,7 @@ export function chengyuToWords(list: ChengYu[]): Word[] {
     id: cy.id,
     text: cy.text,
     pinyin: undefined,
-    example: cy.examples[0]?.sentence ?? '',
+    example: getCustomExample(cy.id) ?? cy.examples[0]?.sentence ?? '',
     wordType: 'word' as const,
     isCustom: false,
   }));
