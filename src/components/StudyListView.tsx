@@ -102,7 +102,12 @@ export default function StudyListView({ words }: StudyListViewProps) {
                   original={word.example ?? ''}
                   addOnly={false}
                   exampleMeaning={word.exampleMeaning}
-                  onSaved={sentence => setCustomExamples(prev => ({ ...prev, [word.id]: sentence }))}
+                  onSaved={sentence => setCustomExamples(prev => {
+                    const next = { ...prev };
+                    if (!sentence || sentence === word.example) delete next[word.id];
+                    else next[word.id] = sentence;
+                    return next;
+                  })}
                 />
               </div>
             </div>
