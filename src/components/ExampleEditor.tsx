@@ -7,9 +7,10 @@ interface ExampleEditorProps {
   original: string;       // textbook/preset sentence (may be empty string)
   addOnly: boolean;       // true = chengyu: cannot replace original, only add custom
   onSaved?: (effectiveSentence: string) => void; // called after save so parent can update TTS
+  exampleMeaning?: string;
 }
 
-export default function ExampleEditor({ wordId, original, addOnly, onSaved }: ExampleEditorProps) {
+export default function ExampleEditor({ wordId, original, addOnly, onSaved, exampleMeaning }: ExampleEditorProps) {
   const [custom, setCustom] = useState<string | null>(() => getCustomExample(wordId));
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -135,6 +136,9 @@ export default function ExampleEditor({ wordId, original, addOnly, onSaved }: Ex
     <div className="mt-2 text-xs text-stone-500 italic pl-1 flex items-start gap-1.5">
       <span className="flex-1 leading-relaxed">
         例：{effective}
+        {exampleMeaning && (
+          <span className="text-stone-400 not-italic"> — {exampleMeaning}</span>
+        )}
         {custom && original && custom !== original && (
           <button
             onClick={handleClear}

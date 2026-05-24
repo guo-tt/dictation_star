@@ -226,6 +226,7 @@ export default function WordCard({ word, index, dictationMode, subject, onMark, 
             wordId={localWord.id}
             original={localWord.example ?? ''}
             addOnly={isChengyu}
+            exampleMeaning={localWord.exampleMeaning}
             onSaved={sentence => setLocalWord(w => ({ ...w, example: sentence }))}
           />
         )}
