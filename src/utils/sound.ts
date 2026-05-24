@@ -53,10 +53,10 @@ const CORRECT_URI = makeWavUri(
 
 const WRONG_URI = makeWavUri(
   [
-    { f0: 320, f1: 140, vol: 0.65, len: 0.45 },
-    { f0: 220, f1: 100, vol: 0.35, len: 0.40, delay: 0.05 },
+    { f0: 1800, f1: 700, vol: 0.65, len: 0.35 },
+    { f0: 1400, f1: 500, vol: 0.40, len: 0.30, delay: 0.04 },
   ],
-  0.50,
+  0.40,
 );
 
 export function playSound(type: 'correct' | 'wrong'): void {

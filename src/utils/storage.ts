@@ -1,4 +1,4 @@
-import { WordRecord, CustomWordEntry, CustomListMeta, Word, Subject, CustomGrade } from '../types';
+import { WordRecord, CustomWordEntry, CustomListMeta, Word, Subject, CustomGrade, GaohuaEntry } from '../types';
 import { findWordInPresets, presetWordLists } from '../data/wordLists';
 
 const RECORDS_KEY = 'dictation_v1';
@@ -453,3 +453,65 @@ export function findWordDataInBanks(
 
   return null;
 }
+
+// ── gaohua custom entries ─────────────────────────────────────────────────────
+
+const GAOHUA_CUSTOM_KEY = 'gaohua_custom_entries';
+
+function loadGaohuaCustom(): GaohuaEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(GAOHUA_CUSTOM_KEY) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function getGaohuaCustomEntries(): GaohuaEntry[] {
+  return loadGaohuaCustom();
+}
+
+export function addGaohuaEntry(entry: Omit<GaohuaEntry, 'id' | 'isCustom'>): GaohuaEntry {
+  const entries = loadGaohuaCustom();
+  const newEntry: GaohuaEntry = {
+    ...entry,
+    id: `gaohua-custom-${Date.now()}`,
+    isCustom: true,
+  };
+  entries.push(newEntry);
+  localStorage.setItem(GAOHUA_CUSTOM_KEY, JSON.stringify(entries));
+  return newEntry;
+}
+
+export function deleteGaohuaEntry(id: string): void {
+  const entries = loadGaohuaCustom().filter(e => e.id !== id);
+  localStorage.setItem(GAOHUA_CUSTOM_KEY, JSON.stringify(entries));
+}
+
+// ── gaohua practice records ───────────────────────────────────────────────────
+
+const GAOHUA_RECORDS_KEY = 'gaohua_records_v1';
+
+export interface GaohuaRecord {
+  lastPracticed: string;
+  totalAttempts: number;
+  wrongCount: number;
+}
+
+export function getGaohuaRecords(): Record<string, GaohuaRecord> {
+  try { return JSON.parse(localStorage.getItem(GAOHUA_RECORDS_KEY) ?? '{}'); }
+  catch { return {}; }
+}
+
+export function saveGaohuaAttempts(results: { id: string; correct: boolean }[]): void {
+  const records = getGaohuaRecords();
+  const now = new Date().toISOString();
+  for (const { id, correct } of results) {
+    const r = records[id] ?? { lastPracticed: now, totalAttempts: 0, wrongCount: 0 };
+    r.totalAttempts++;
+    if (!correct) r.wrongCount++;
+    r.lastPracticed = now;
+    records[id] = r;
+  }
+  localStorage.setItem(GAOHUA_RECORDS_KEY, JSON.stringify(records));
+}
+

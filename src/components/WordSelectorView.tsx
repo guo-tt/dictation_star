@@ -55,6 +55,8 @@ export default function WordSelectorView({
   const didDragRef = useRef(false);
   const displayWordsRef = useRef<Word[]>([]);
   const dragMoveFnRef = useRef<((e: TouchEvent) => void) | null>(null);
+  const autoScrollRef = useRef<number | null>(null);
+  const touchPosRef = useRef<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     setStatsVersion(v => v + 1);
@@ -177,10 +179,60 @@ export default function WordSelectorView({
     if (activeRule) applyRule(activeRule, size);
   }
 
+  function applyDragSelection(x: number, y: number) {
+    const d = dragRef.current;
+    if (!d) return;
+    const target = document.elementFromPoint(x, y)
+      ?.closest('[data-word-index]') as HTMLElement | null;
+    if (!target) return;
+    const i = parseInt(target.dataset.wordIndex ?? '-1');
+    if (i < 0) return;
+    const words = displayWordsRef.current;
+    const lo = Math.min(d.startIndex, i);
+    const hi = Math.max(d.startIndex, i);
+    const next = new Set(d.initialIds);
+    for (let j = lo; j <= hi; j++) {
+      if (words[j]) {
+        if (d.isSelecting) next.add(words[j].id);
+        else next.delete(words[j].id);
+      }
+    }
+    setSelectedIds(next);
+    setQuickSelectMode('none');
+    setActiveRule(null);
+  }
+
+  function stopAutoScroll() {
+    if (autoScrollRef.current !== null) {
+      cancelAnimationFrame(autoScrollRef.current);
+      autoScrollRef.current = null;
+    }
+  }
+
+  function startAutoScroll() {
+    if (autoScrollRef.current !== null) return;
+    function tick() {
+      const pos = touchPosRef.current;
+      const container = listRef.current;
+      if (!pos || !container || !dragRef.current) { autoScrollRef.current = null; return; }
+      const rect = container.getBoundingClientRect();
+      const ZONE = 72;
+      const MAX_SPEED = 10;
+      let delta = 0;
+      if (pos.y > rect.bottom - ZONE) delta = MAX_SPEED * ((pos.y - (rect.bottom - ZONE)) / ZONE);
+      else if (pos.y < rect.top + ZONE) delta = -MAX_SPEED * (((rect.top + ZONE) - pos.y) / ZONE);
+      if (delta !== 0) {
+        container.scrollTop += delta;
+        applyDragSelection(pos.x, pos.y);
+      }
+      autoScrollRef.current = requestAnimationFrame(tick);
+    }
+    autoScrollRef.current = requestAnimationFrame(tick);
+  }
+
   function handleDragTouchStart(e: React.TouchEvent) {
     didDragRef.current = false;
     const touch = e.touches[0];
-    // Only activate when touch starts on the handle zone
     if (!(touch.target as Element).closest('[data-drag-handle]')) return;
     const wordEl = (touch.target as Element).closest('[data-word-index]') as HTMLElement | null;
     if (!wordEl) return;
@@ -201,26 +253,17 @@ export default function WordSelectorView({
       const d = dragRef.current;
       if (!d) return;
       const t = ev.touches[0];
-      const target = document.elementFromPoint(t.clientX, t.clientY)
-        ?.closest('[data-word-index]') as HTMLElement | null;
-      if (!target) return;
-      const i = parseInt(target.dataset.wordIndex ?? '-1');
-      if (i < 0) return;
       ev.preventDefault();
       d.active = true;
-      const words = displayWordsRef.current;
-      const lo = Math.min(d.startIndex, i);
-      const hi = Math.max(d.startIndex, i);
-      const next = new Set(d.initialIds);
-      for (let j = lo; j <= hi; j++) {
-        if (words[j]) {
-          if (d.isSelecting) next.add(words[j].id);
-          else next.delete(words[j].id);
-        }
+      touchPosRef.current = { x: t.clientX, y: t.clientY };
+      applyDragSelection(t.clientX, t.clientY);
+      const container = listRef.current;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        const ZONE = 72;
+        if (t.clientY > rect.bottom - ZONE || t.clientY < rect.top + ZONE) startAutoScroll();
+        else stopAutoScroll();
       }
-      setSelectedIds(next);
-      setQuickSelectMode('none');
-      setActiveRule(null);
     }
 
     dragMoveFnRef.current = onDragMove;
@@ -228,6 +271,8 @@ export default function WordSelectorView({
   }
 
   function handleDragTouchEnd() {
+    stopAutoScroll();
+    touchPosRef.current = null;
     const el = listRef.current;
     if (el && dragMoveFnRef.current) {
       el.removeEventListener('touchmove', dragMoveFnRef.current);
@@ -278,6 +323,132 @@ export default function WordSelectorView({
 
   return (
     <div className="flex flex-col h-full">
+
+      {/* ── Top controls (always visible) ── */}
+      <div className="bg-stone-50 border-b border-stone-100 px-4 pt-3 pb-2 flex flex-col gap-2 flex-shrink-0">
+
+        {mode === 'lesson' ? (
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1.5 flex-1">
+              <button
+                onClick={handleSelectAll}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                  quickSelectMode === 'all'
+                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                    : 'bg-white border-stone-200 text-stone-400'
+                }`}
+              >
+                选择全部
+              </button>
+              <button
+                onClick={handleSelectFive}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                  quickSelectMode === 'five'
+                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                    : 'bg-white border-stone-200 text-stone-400'
+                }`}
+              >
+                选择5个
+              </button>
+              <button
+                onClick={handleSelectRandom}
+                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                  quickSelectMode === 'random'
+                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                    : 'bg-white border-stone-200 text-stone-400'
+                }`}
+              >
+                随机5个
+              </button>
+            </div>
+            <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
+              已选 {selectedIds.size} 个
+            </span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">智能选词</span>
+              <div className="flex gap-1.5 flex-1">
+                {AUTO_RULES.map(({ rule, label }) => (
+                  <button
+                    key={rule}
+                    onClick={() => handleRuleClick(rule)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      activeRule === rule
+                        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
+                        : 'bg-white border-stone-200 text-stone-400'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
+                已选 {selectedIds.size} 个
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-400 flex-shrink-0">每次</span>
+              <div className="flex gap-1.5 flex-1">
+                {SESSION_SIZES_MIXED.map(n => (
+                  <button
+                    key={n}
+                    onClick={() => handleSizeClick(n)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
+                      sessionSize === n
+                        ? 'bg-[#8090C0] text-white border-[#8090C0]'
+                        : 'bg-white border-stone-200 text-stone-400'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <span className="text-xs text-stone-400 flex-shrink-0">个词</span>
+            </div>
+          </>
+        )}
+
+        {/* Reset */}
+        <div className="flex justify-center pt-0.5">
+          {confirmReset ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-stone-500">{resetLabel}？</span>
+              <button
+                onClick={handleReset}
+                className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
+              >
+                确认重置
+              </button>
+              <button
+                onClick={() => setConfirmReset(false)}
+                className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmReset(true)}
+              className="text-xs text-stone-300 active:text-[#D09098] transition-colors"
+            >
+              重置进度
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Start button (sticky top) ── */}
+      <div className="bg-white border-b border-stone-100 shadow-[0_4px_16px_rgba(0,0,0,0.06)] px-4 py-3 flex-shrink-0">
+        <button
+          disabled={selectedIds.size === 0}
+          onClick={handleStart}
+          className="w-full py-3 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] disabled:opacity-40"
+        >
+          {selectedIds.size > 0 ? `开始听写 · ${selectedIds.size} 个词 →` : '请选择词语'}
+        </button>
+      </div>
 
       {/* ── Word stats list ── */}
       <div
@@ -367,132 +538,6 @@ export default function WordSelectorView({
             </button>
           );
         })}
-      </div>
-
-      {/* ── Bottom bar (mode-specific) ── */}
-      <div className="bg-stone-50 border-t border-stone-100 px-4 py-3 flex flex-col gap-2">
-
-        {mode === 'lesson' ? (
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1.5 flex-1">
-              <button
-                onClick={handleSelectAll}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                  quickSelectMode === 'all'
-                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                    : 'bg-white border-stone-200 text-stone-400'
-                }`}
-              >
-                选择全部
-              </button>
-              <button
-                onClick={handleSelectFive}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                  quickSelectMode === 'five'
-                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                    : 'bg-white border-stone-200 text-stone-400'
-                }`}
-              >
-                选择5个
-              </button>
-              <button
-                onClick={handleSelectRandom}
-                className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                  quickSelectMode === 'random'
-                    ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                    : 'bg-white border-stone-200 text-stone-400'
-                }`}
-              >
-                随机5个
-              </button>
-            </div>
-            <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
-              已选 {selectedIds.size} 个
-            </span>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400 flex-shrink-0">智能选词</span>
-              <div className="flex gap-1.5 flex-1">
-                {AUTO_RULES.map(({ rule, label }) => (
-                  <button
-                    key={rule}
-                    onClick={() => handleRuleClick(rule)}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                      activeRule === rule
-                        ? 'bg-[#F0F2FB] border-[#B0BCDC] text-[#5868A8]'
-                        : 'bg-white border-stone-200 text-stone-400'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <span className="text-xs text-stone-500 font-medium flex-shrink-0 w-12 text-right">
-                已选 {selectedIds.size} 个
-              </span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-stone-400 flex-shrink-0">每次</span>
-              <div className="flex gap-1.5 flex-1">
-                {SESSION_SIZES_MIXED.map(n => (
-                  <button
-                    key={n}
-                    onClick={() => handleSizeClick(n)}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-semibold transition border ${
-                      sessionSize === n
-                        ? 'bg-[#8090C0] text-white border-[#8090C0]'
-                        : 'bg-white border-stone-200 text-stone-400'
-                    }`}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <span className="text-xs text-stone-400 flex-shrink-0">个词</span>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* ── Reset progress ── */}
-      <div className="bg-stone-50 border-t border-stone-100 px-4 py-2 flex justify-center">
-        {confirmReset ? (
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-stone-500">{resetLabel}？</span>
-            <button
-              onClick={handleReset}
-              className="px-2.5 py-1 rounded-lg bg-[#D09098] text-white text-xs font-semibold"
-            >
-              确认重置
-            </button>
-            <button
-              onClick={() => setConfirmReset(false)}
-              className="px-2.5 py-1 rounded-lg bg-stone-100 text-stone-600 text-xs font-semibold"
-            >
-              取消
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setConfirmReset(true)}
-            className="text-xs text-stone-300 active:text-[#D09098] transition-colors"
-          >
-            重置进度
-          </button>
-        )}
-      </div>
-
-      {/* ── Start button ── */}
-      <div className="bg-white border-t border-stone-100 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] px-4 py-4">
-        <button
-          disabled={selectedIds.size === 0}
-          onClick={handleStart}
-          className="w-full py-3 rounded-2xl text-white font-bold text-base shadow-md active:scale-[0.98] transition bg-gradient-to-r from-[#7888C8] to-[#A8B8DC] disabled:opacity-40"
-        >
-          {selectedIds.size > 0 ? `开始听写 · ${selectedIds.size} 个词 →` : '请选择词语'}
-        </button>
       </div>
     </div>
   );

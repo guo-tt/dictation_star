@@ -12,8 +12,8 @@ import BottomToolbar from './components/BottomToolbar';
 import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords, clearAllRecords, getCustomListsForGrade, getCustomWordsForList } from './utils/storage';
 import LessonEditView from './components/LessonEditView';
 import { presetWordLists } from './data/wordLists';
-import { gaohuaWords } from './data/gaohuaWords';
 import ChengYuStudyView from './components/ChengYuStudyView';
+import GaohuaView from './components/GaohuaView';
 import ChengYuSelectorView from './components/ChengYuSelectorView';
 import type { ChengYu } from './data/chengyu';
 
@@ -135,11 +135,8 @@ export default function App() {
     setView('dictation');
   }
 
-  function startGaohuaDictation(mode: DictationMode) {
-    setDictationMode(mode);
-    setSessionConfig({ words: gaohuaWords, grade: '高华改错字' });
-    setDictationKey(k => k + 1);
-    setView('dictation');
+  function openGaohua() {
+    setView('gaohua');
   }
 
   function startChengyuDictation(words: Word[], label: string, mode: DictationMode) {
@@ -214,6 +211,7 @@ export default function App() {
   function handleBack() {
     if (view === 'chengyuSelector') { setView('wordlists'); return; }
     if (view === 'chengyuStudy') { setView('wordlists'); return; }
+    if (view === 'gaohua') { setView('wordlists'); return; }
     if (view === 'lessonEdit') {
       setView('wordlists');
       return;
@@ -237,13 +235,14 @@ export default function App() {
     : view === 'study' ? `学习：${selectedList?.name ?? ''}`
     : view === 'chengyuStudy' ? `学习成语 · ${chengyuStudyLabel}`
     : view === 'chengyuSelector' ? '选择成语'
+    : view === 'gaohua' ? '高华改错字'
     : sessionConfig ? `听写 · ${sessionConfig.grade}`
     : selectedList?.name ?? '听写';
 
   const headerBack =
     view === 'dictation' || view === 'study' || view === 'wordSelector' ||
     view === 'lessonSelector' || view === 'studyList' || view === 'lessonEdit' ||
-    view === 'chengyuStudy' || view === 'chengyuSelector'
+    view === 'chengyuStudy' || view === 'chengyuSelector' || view === 'gaohua'
       ? handleBack
       : undefined;
 
@@ -269,7 +268,7 @@ export default function App() {
             onStartChengyuStudy={startChengyuStudy}
             onStartGradeStudy={startGradeStudy}
             onStartListStudy={startListStudy}
-            onStartGaohuaDictation={startGaohuaDictation}
+            onOpenGaohua={openGaohua}
             onResetAll={clearAllRecords}
           />
         )}
@@ -318,6 +317,9 @@ export default function App() {
         {view === 'chengyuStudy' && (
           <ChengYuStudyView list={chengyuStudyList} />
         )}
+        {view === 'gaohua' && (
+          <GaohuaView />
+        )}
         {view === 'chengyuSelector' && (
           <ChengYuSelectorView
             mode={chengyuSelectorMode}
@@ -326,7 +328,7 @@ export default function App() {
         )}
       </main>
 
-      {view !== 'wordSelector' && view !== 'chengyuSelector' && (
+      {view !== 'wordSelector' && view !== 'chengyuSelector' && view !== 'gaohua' && (
         <BottomToolbar
           contextWords={toolbarContext.contextWords}
           resetLabel={toolbarContext.resetLabel}

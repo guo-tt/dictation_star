@@ -3,3 +3,10 @@
 .env*.local
 node_modules/
 dist/
+.playwright-mcp/
+*.png
+appstore-screenshots/
+take-screenshots.mjs
+.claude/
+src/data/chengyu*.ts
+data/*.apkg

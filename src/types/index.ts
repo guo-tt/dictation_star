@@ -1,5 +1,13 @@
 export type Subject = 'chinese' | 'english';
-export type ViewMode = 'wordlists' | 'lessonSelector' | 'lessonEdit' | 'wordSelector' | 'dictation' | 'study' | 'studyList' | 'chengyuStudy' | 'chengyuSelector';
+export type ViewMode = 'wordlists' | 'lessonSelector' | 'lessonEdit' | 'wordSelector' | 'dictation' | 'study' | 'studyList' | 'chengyuStudy' | 'chengyuSelector' | 'gaohua';
+
+export interface GaohuaEntry {
+  id: string;
+  wrongSentence: string;  // sentence as shown, with wrong word present
+  wrongWord: string;      // the wrong word/char (may be wrapped as （X） in sentence)
+  correctWord: string;
+  isCustom?: boolean;
+}
 export type GradeFilter = 'all' | 5 | 6;
 
 export interface SessionConfig {

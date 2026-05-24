@@ -22,7 +22,7 @@ interface WordListViewProps {
   onStartChengyuStudy: (list: ChengYu[], label: string) => void;
   onStartGradeStudy: (gradeId: string, gradeName: string) => void;
   onStartListStudy: (listId: string, title: string) => void;
-  onStartGaohuaDictation: (mode: DictationMode) => void;
+  onOpenGaohua: () => void;
   onResetAll: () => void;
 }
 
@@ -57,7 +57,7 @@ export default function WordListView({
   onStartChengyuStudy,
   onStartGradeStudy,
   onStartListStudy,
-  onStartGaohuaDictation,
+  onOpenGaohua,
   onResetAll,
 }: WordListViewProps) {
   const [mainTab, setMainTab] = useState<'dictation' | 'study'>('dictation');
@@ -355,8 +355,8 @@ export default function WordListView({
 
           {/* Row 5: 高华改错字 */}
           <button
-            onClick={() => onStartGaohuaDictation(dictationMode)}
-            className="w-full rounded-2xl px-4 py-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
+            onClick={() => onOpenGaohua()}
+            className="w-1/2 rounded-2xl px-4 py-4 text-left border-2 border-stone-200 bg-white active:scale-[0.98] transition"
           >
             <div className="text-sm font-bold text-stone-700">高华改错字</div>
             <div className="text-xs text-stone-400 mt-0.5">82 题 · 找出句中错字并改正</div>
