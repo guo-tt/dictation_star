@@ -5,6 +5,7 @@ import { getWordStats, deleteCustomWord, clearWordRecord } from '../utils/storag
 import { playSound } from '../utils/sound';
 import { getDisplayPinyin } from '../utils/pinyin';
 import EditWordModal from './EditWordModal';
+import ExampleEditor from './ExampleEditor';
 
 interface WordCardProps {
   word: Word;
@@ -79,6 +80,7 @@ export default function WordCard({ word, index, dictationMode, subject, onMark, 
   }, [stats.lastPracticed, statsVersion]);
 
   const showText = dictationMode === 'parent' || revealed;
+  const isChengyu = localWord.id.startsWith('cy-');
 
   // Accent colors
   const accentBg = isChinese ? 'bg-[#8090C0]' : 'bg-[#6898B8]';
@@ -219,13 +221,13 @@ export default function WordCard({ word, index, dictationMode, subject, onMark, 
         </div>
 
         {/* Example sentence preview (in parent mode) */}
-        {showText && localWord.example && (
-          <div className="mt-2 text-xs text-stone-500 italic pl-1">
-            例：{localWord.example}
-            {localWord.exampleMeaning && (
-              <span className="text-stone-400 not-italic"> — {localWord.exampleMeaning}</span>
-            )}
-          </div>
+        {showText && (
+          <ExampleEditor
+            wordId={localWord.id}
+            original={localWord.example ?? ''}
+            addOnly={isChengyu}
+            onSaved={sentence => setLocalWord(w => ({ ...w, example: sentence }))}
+          />
         )}
       </div>
 
