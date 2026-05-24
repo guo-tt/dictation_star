@@ -10,3 +10,4 @@ take-screenshots.mjs
 .claude/
 src/data/chengyu*.ts
 data/*.apkg
+data/*.docx
