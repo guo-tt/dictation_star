@@ -59,6 +59,34 @@ export function clearWordsRecords(wordIds: string[]): void {
   localStorage.setItem(RECORDS_KEY, JSON.stringify(records));
 }
 
+// ── custom example sentences ──────────────────────────────────────────────────────
+
+const CUSTOM_EXAMPLES_KEY = 'dictation_custom_examples';
+
+function getCustomExamples(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(CUSTOM_EXAMPLES_KEY) ?? '{}');
+  } catch {
+    return {};
+  }
+}
+
+export function getCustomExample(id: string): string | null {
+  return getCustomExamples()[id] ?? null;
+}
+
+export function setCustomExample(id: string, sentence: string): void {
+  const all = getCustomExamples();
+  all[id] = sentence;
+  localStorage.setItem(CUSTOM_EXAMPLES_KEY, JSON.stringify(all));
+}
+
+export function clearCustomExample(id: string): void {
+  const all = getCustomExamples();
+  delete all[id];
+  localStorage.setItem(CUSTOM_EXAMPLES_KEY, JSON.stringify(all));
+}
+
 export function getAllRecords(): Record<string, WordRecord> {
   try {
     const raw = JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}');
