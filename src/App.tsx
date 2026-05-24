@@ -12,6 +12,7 @@ import BottomToolbar from './components/BottomToolbar';
 import { ensureFreshInstall, applyOverridesAndFilter, getHiddenListIds, clearWordsRecords, clearAllRecords, getCustomListsForGrade, getCustomWordsForList } from './utils/storage';
 import LessonEditView from './components/LessonEditView';
 import { presetWordLists } from './data/wordLists';
+import { gaohuaWords } from './data/gaohuaWords';
 import ChengYuStudyView from './components/ChengYuStudyView';
 import ChengYuSelectorView from './components/ChengYuSelectorView';
 import type { ChengYu } from './data/chengyu';
@@ -89,10 +90,11 @@ export default function App() {
     setView('wordSelector');
   }
 
-  function openLessonSelector(mode: DictationMode) {
+  function openPresetLesson(lessonId: string, mode: DictationMode) {
     setDictationMode(mode);
-    setLessonSelectorMode('dictation');
-    setView('lessonSelector');
+    setSelectedLessonId(lessonId);
+    setSelectorMode('lesson');
+    setView('wordSelector');
   }
 
   function openStudyLessonSelector() {
@@ -133,6 +135,13 @@ export default function App() {
     setView('dictation');
   }
 
+  function startGaohuaDictation(mode: DictationMode) {
+    setDictationMode(mode);
+    setSessionConfig({ words: gaohuaWords, grade: '高华改错字' });
+    setDictationKey(k => k + 1);
+    setView('dictation');
+  }
+
   function startChengyuDictation(words: Word[], label: string, mode: DictationMode) {
     setDictationMode(mode);
     setSessionConfig({ words, grade: `成语 · ${label}` });
@@ -156,6 +165,13 @@ export default function App() {
     const words = lists.flatMap(l => getCustomWordsForList(l.id));
     setStudyWords(words);
     setStudyTitle(gradeName);
+    setStudyOrigin('wordlists');
+    setView('studyList');
+  }
+
+  function startListStudy(listId: string, title: string) {
+    setStudyWords(getCustomWordsForList(listId));
+    setStudyTitle(title);
     setStudyOrigin('wordlists');
     setView('studyList');
   }
@@ -232,7 +248,7 @@ export default function App() {
       : undefined;
 
   return (
-    <div className="min-h-screen bg-stone-50 flex flex-col max-w-2xl mx-auto">
+    <div className="h-screen overflow-hidden bg-stone-50 flex flex-col max-w-2xl mx-auto">
       <Header
         onBack={headerBack}
         title={headerTitle}
@@ -243,7 +259,7 @@ export default function App() {
         {view === 'wordlists' && (
           <WordListView
             onOpenMixedSelector={openMixedSelector}
-            onOpenLessonSelector={openLessonSelector}
+            onOpenPresetLesson={openPresetLesson}
             onOpenStudyGrade={openStudyGrade}
             onOpenStudyLessonSelector={openStudyLessonSelector}
             onEditLesson={openLessonEdit}
@@ -252,6 +268,8 @@ export default function App() {
             onOpenChengyuSelector={openChengyuSelector}
             onStartChengyuStudy={startChengyuStudy}
             onStartGradeStudy={startGradeStudy}
+            onStartListStudy={startListStudy}
+            onStartGaohuaDictation={startGaohuaDictation}
             onResetAll={clearAllRecords}
           />
         )}
@@ -308,13 +326,15 @@ export default function App() {
         )}
       </main>
 
-      <BottomToolbar
-        contextWords={toolbarContext.contextWords}
-        resetLabel={toolbarContext.resetLabel}
-        showRandom={view === 'dictation'}
-        onStartRandom={handleStartRandom}
-        onReset={() => clearWordsRecords(toolbarContext.contextWords.map(w => w.id))}
-      />
+      {view !== 'wordSelector' && view !== 'chengyuSelector' && (
+        <BottomToolbar
+          contextWords={toolbarContext.contextWords}
+          resetLabel={toolbarContext.resetLabel}
+          showRandom={view === 'dictation'}
+          onStartRandom={handleStartRandom}
+          onReset={() => clearWordsRecords(toolbarContext.contextWords.map(w => w.id))}
+        />
+      )}
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
     </div>
