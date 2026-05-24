@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Word } from '../types';
 import { Volume2, BookOpen } from 'lucide-react';
 import { getDisplayPinyin } from '../utils/pinyin';
+import { getCustomExample } from '../utils/storage';
+import ExampleEditor from './ExampleEditor';
 
 interface StudyListViewProps {
   words: Word[];
@@ -16,6 +19,15 @@ function speak(text: string) {
 }
 
 export default function StudyListView({ words }: StudyListViewProps) {
+  const [customExamples, setCustomExamples] = useState<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const w of words) {
+      const c = getCustomExample(w.id);
+      if (c) map[w.id] = c;
+    }
+    return map;
+  });
+
   if (words.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-10 text-center">
@@ -77,7 +89,7 @@ export default function StudyListView({ words }: StudyListViewProps) {
                     <span>朗读</span>
                   </button>
                   <button
-                    onClick={() => speak(word.example)}
+                    onClick={() => speak(customExamples[word.id] ?? word.example)}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-600 hover:bg-stone-700 active:bg-stone-800 text-white text-sm font-medium transition-colors shadow-sm"
                   >
                     <BookOpen size={16} />
@@ -85,16 +97,13 @@ export default function StudyListView({ words }: StudyListViewProps) {
                   </button>
                 </div>
 
-                {word.example && (
-                  <div className="mt-2 text-xs text-stone-500 italic pl-1">
-                    例：{word.example}
-                    {word.exampleMeaning && (
-                      <span className="text-stone-400 not-italic">
-                        {' '}— {word.exampleMeaning}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <ExampleEditor
+                  wordId={word.id}
+                  original={word.example ?? ''}
+                  addOnly={false}
+                  exampleMeaning={word.exampleMeaning}
+                  onSaved={sentence => setCustomExamples(prev => ({ ...prev, [word.id]: sentence }))}
+                />
               </div>
             </div>
           ))}
