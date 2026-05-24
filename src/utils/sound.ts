@@ -1,74 +1,65 @@
-const AudioCtxClass =
-  window.AudioContext ||
-  (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+// Generate a WAV data URI from mixed sine-wave tracks.
+// Using HTMLAudioElement instead of Web Audio API for reliable iOS/Capacitor support.
+function makeWavUri(
+  tracks: Array<{ f0: number; f1: number; vol: number; len: number; delay?: number }>,
+  totalLen: number,
+): string {
+  const sr = 22050;
+  const n = Math.floor(sr * totalLen);
+  const pcm = new Float32Array(n);
 
-let sharedCtx: AudioContext | null = null;
-let unlocked = false;
-
-function getCtx(): AudioContext | null {
-  if (!AudioCtxClass) return null;
-  try {
-    if (!sharedCtx || sharedCtx.state === 'closed') sharedCtx = new AudioCtxClass();
-    return sharedCtx;
-  } catch {
-    return null;
+  for (const { f0, f1, vol, len, delay = 0 } of tracks) {
+    const start = Math.floor(sr * delay);
+    const end = Math.min(n, start + Math.floor(sr * len));
+    for (let i = start; i < end; i++) {
+      const t = (i - start) / sr;
+      const freq = f0 + (f1 - f0) * Math.min(1, t / (len * 0.6));
+      const fadeIn = Math.min(1, t * 120);
+      const fadeOut = Math.min(1, (len - t) * 30);
+      pcm[i] += Math.sin(2 * Math.PI * freq * t) * vol * fadeIn * fadeOut;
+    }
   }
+
+  // Normalise to avoid clipping
+  let peak = 0;
+  for (const s of pcm) if (Math.abs(s) > peak) peak = Math.abs(s);
+  const scale = peak > 0 ? 0.88 / peak : 1;
+
+  // Build 8-bit mono WAV
+  const bytes = new Uint8Array(44 + n);
+  const dv = new DataView(bytes.buffer);
+  const tag = (o: number, s: string) => { for (let i = 0; i < s.length; i++) bytes[o + i] = s.charCodeAt(i); };
+  tag(0, 'RIFF'); dv.setUint32(4, 36 + n, true); tag(8, 'WAVE');
+  tag(12, 'fmt '); dv.setUint32(16, 16, true); dv.setUint16(20, 1, true);
+  dv.setUint16(22, 1, true); dv.setUint32(24, sr, true); dv.setUint32(28, sr, true);
+  dv.setUint16(32, 1, true); dv.setUint16(34, 8, true);
+  tag(36, 'data'); dv.setUint32(40, n, true);
+  for (let i = 0; i < n; i++) bytes[44 + i] = Math.round((pcm[i] * scale + 1) * 127.5);
+
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return 'data:audio/wav;base64,' + btoa(bin);
 }
 
-// iOS WKWebView requires a silent buffer to be played on first user gesture
-// before any Web Audio will produce output.
-function unlockOnce(ctx: AudioContext): void {
-  if (unlocked) return;
-  try {
-    const buf = ctx.createBuffer(1, 1, 22050);
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(ctx.destination);
-    src.start(0);
-    unlocked = true;
-  } catch {
-    // ignore — best-effort unlock
-  }
-}
+// Pre-generate at module load so first play has no latency
+const CORRECT_URI = makeWavUri(
+  [
+    { f0: 660, f1: 1320, vol: 0.6, len: 0.18 },
+    { f0: 990, f1: 1980, vol: 0.3, len: 0.18 },
+    { f0: 880, f1: 1760, vol: 0.45, len: 0.15, delay: 0.12 },
+  ],
+  0.30,
+);
 
-function playTone(
-  ctx: AudioContext,
-  freq: number,
-  endFreq: number,
-  type: OscillatorType,
-  volume: number,
-  duration: number,
-  startOffset = 0,
-) {
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain);
-  gain.connect(ctx.destination);
-  const t = ctx.currentTime + 0.01 + startOffset;
-  osc.type = type;
-  osc.frequency.setValueAtTime(freq, t);
-  osc.frequency.linearRampToValueAtTime(endFreq, t + duration * 0.6);
-  gain.gain.setValueAtTime(0, t);
-  gain.gain.linearRampToValueAtTime(volume, t + 0.01);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
-  osc.start(t);
-  osc.stop(t + duration);
-}
+const WRONG_URI = makeWavUri(
+  [
+    { f0: 320, f1: 140, vol: 0.65, len: 0.45 },
+    { f0: 220, f1: 100, vol: 0.35, len: 0.40, delay: 0.05 },
+  ],
+  0.50,
+);
 
 export function playSound(type: 'correct' | 'wrong'): void {
-  const ctx = getCtx();
-  if (!ctx) return;
-
-  unlockOnce(ctx);
-
-  ctx.resume().then(() => {
-    if (type === 'correct') {
-      playTone(ctx, 660, 1320, 'sine', 0.28, 0.18);
-      playTone(ctx, 990, 1980, 'sine', 0.12, 0.18);
-      playTone(ctx, 880, 1760, 'sine', 0.18, 0.15, 0.12);
-    } else {
-      playTone(ctx, 320, 140, 'triangle', 0.30, 0.45);
-      playTone(ctx, 220, 100, 'triangle', 0.15, 0.45, 0.05);
-    }
-  }).catch(() => {});
+  const audio = new Audio(type === 'correct' ? CORRECT_URI : WRONG_URI);
+  audio.play().catch(() => {});
 }
